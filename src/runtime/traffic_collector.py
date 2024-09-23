@@ -1,13 +1,10 @@
-import logging
+import anyio
 import numpy as np
 import socket
 import struct
-import threading
 
 from collections import defaultdict
-
-
-logger = logging.getLogger(__name__)
+from typing import Sequence, Mapping
 
 
 class ReportEntry:
@@ -15,62 +12,48 @@ class ReportEntry:
         self.count, tor, _ = struct.unpack_from("QII", buffer, offset)
         self.target: str = socket.inet_ntoa(struct.pack("I", socket.ntohl(tor)))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"target: {self.target}, count: {self.count}"
 
 
-class TrafficCollector(threading.Thread):
+class __TrafficCollectorImpl:
+
     def __init__(
-        self,
-        host_tor_map: dict[str, str],
-        ipv4: str,
-        port: int = 1599,
-        buffer_size: int = 1024,
+        self, hosts: Sequence[str], tors: Sequence[str], relaions: Mapping[str, str]
     ):
-        self.__host_tor_map = host_tor_map
-        self.__tor_host_map = defaultdict(list)
-        for host, tor in self.__host_tor_map.items():
-            self.__tor_host_map[tor].append(host)
-        self.__tors = list(self.__tor_host_map.keys())
+        self.__hosts = hosts
+        self.__tors = tors
+        self.__relations = relaions
 
-        self.__traffic_matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
-        self.__traffic_history = {
-            host: defaultdict(int) for host in self.__host_tor_map.keys()
-        }
-        self.__traffic_lock = threading.Lock()
+        self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
+        self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
-        super().__init__(target=self.__collect_daemon_fn, args=(ipv4, port, buffer_size))
+    def update(self, source: str, report: Sequence[ReportEntry]) -> np.ndarray:
+        source_tor = self.__relations[source]
+        for entry in report:
+            target_tor = self.__relations[entry.target]
+            self.__matrix[self.__tors.index(source_tor)][
+                self.__tors.index(target_tor)
+            ] += (entry.count - self.__traffic[source][entry.target])
+            self.__traffic[source][entry.target] = entry.count
 
-    def __collect_daemon_fn(self, ipv4: str, port: int, buffer_size: int):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((ipv4, port))
+        return np.copy(self.__matrix)
 
-        while True:
-            data, (source, _) = sock.recvfrom(buffer_size)
+
+async def TrafficCollector(
+    hosts: Sequence[str],
+    tors: Sequence[str],
+    relations: Mapping[str, str],
+    host: str = "0.0.0.0",
+    port: int = 1599,
+):
+    traffic_collector_impl = __TrafficCollectorImpl(hosts, tors, relations)
+    async with await anyio.create_udp_socket(
+        family=socket.AF_INET, local_host=host, local_port=port
+    ) as udp:
+        async for packet, (source, _) in udp:
             entry_size = struct.calcsize("QII")
-            report_len = len(data) // entry_size
+            report_len = len(packet) // entry_size
 
-            report = [ReportEntry(data, i * entry_size) for i in range(report_len)]
-            self.__update_traffic_matrix(source, report)
-
-    def __update_traffic_matrix(self, source: str, report: list[ReportEntry]):
-        source_tor = self.__host_tor_map[source]
-        with self.__traffic_lock:
-            for entry in report:
-                target_tor = self.__host_tor_map[entry.target]
-                self.__traffic_matrix[self.__tors.index(source_tor)][
-                    self.__tors.index(target_tor)
-                ] += (entry.count - self.__traffic_history[source][entry.target])
-                self.__traffic_history[source][entry.target] = entry.count
-
-        logger.debug(f"Traffic Matrix:\n{self.__traffic_matrix}")
-
-    def __enter__(self) -> bool:
-        return self.__traffic_lock.__enter__()
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        return self.__traffic_lock.__exit__(exc_type, exc_value, traceback)
-    
-    def __call__(self) -> np.ndarray:
-        with self.__traffic_lock:
-            return np.copy(self.__traffic_matrix)
+            report = [ReportEntry(packet, i * entry_size) for i in range(report_len)]
+            yield traffic_collector_impl.update(source, report)
