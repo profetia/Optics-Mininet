@@ -4,7 +4,7 @@ import socket
 import struct
 
 from collections import defaultdict
-from typing import Sequence, Mapping
+from typing import Optional, Sequence, Mapping
 
 
 class ReportEntry:
@@ -19,35 +19,46 @@ class ReportEntry:
 class __TrafficCollectorImpl:
 
     def __init__(
-        self, hosts: Sequence[str], tors: Sequence[str], relaions: Mapping[str, str]
+        self,
+        hosts: Sequence[str],
+        tors: Sequence[str],
+        relaions: Mapping[str, str],
+        host_map: Optional[Mapping[str, str]] = None,
     ):
         self.__hosts = hosts
         self.__tors = tors
         self.__relations = relaions
 
+        if host_map is None:
+            host_map = {host: host for host in hosts}
+
+        self.__host_map = host_map
+
         self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
         self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
     def update(self, source: str, report: Sequence[ReportEntry]) -> np.ndarray:
-        source_tor = self.__relations[source]
+        real_source = self.__host_map[source]
+        source_tor = self.__relations[real_source]
         for entry in report:
             target_tor = self.__relations[entry.target]
             self.__matrix[self.__tors.index(source_tor)][
                 self.__tors.index(target_tor)
-            ] += (entry.count - self.__traffic[source][entry.target])
-            self.__traffic[source][entry.target] = entry.count
+            ] += (entry.count - self.__traffic[real_source][entry.target])
+            self.__traffic[real_source][entry.target] = entry.count
 
-        return np.copy(self.__matrix)
+        return self.__matrix
 
 
 async def TrafficCollector(
     hosts: Sequence[str],
     tors: Sequence[str],
     relations: Mapping[str, str],
+    host_map: Optional[Mapping[str, str]] = None,
     host: str = "0.0.0.0",
     port: int = 1599,
 ):
-    traffic_collector_impl = __TrafficCollectorImpl(hosts, tors, relations)
+    traffic_collector_impl = __TrafficCollectorImpl(hosts, tors, relations, host_map)
     async with await anyio.create_udp_socket(
         family=socket.AF_INET, local_host=host, local_port=port
     ) as udp:
