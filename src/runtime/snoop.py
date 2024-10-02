@@ -1,10 +1,18 @@
-import asyncio
 import argparse
 
-from runtime.traffic_collector import TrafficCollector
+from runtime import Runtime
 
 
-def parse_args() -> argparse.Namespace:
+def __trigger_fn(matrix):
+    print(matrix)
+    return False
+
+
+def __schedule_fn(matrix):
+    pass
+
+
+def __parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="opsys_control")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
@@ -15,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def main(args: argparse.Namespace) -> None:
+def __main(args: argparse.Namespace) -> None:
     host_x10 = "10.29.1.110"
     host_x11 = "10.29.1.111"
     host_x12 = "10.29.1.120"
@@ -78,12 +86,20 @@ async def main(args: argparse.Namespace) -> None:
         host_x17_mapped: host_x17,
     }
 
-    async for matrix in TrafficCollector(
-        hosts, tors, relations, host_map=host_map, host=args.address, port=args.port
-    ):
-        print(matrix)
+    runtime = Runtime(
+        trigger_fn=__trigger_fn,
+        schedule_fn=__schedule_fn,
+        host=args.address,
+        port=args.port,
+        hosts=hosts,
+        tors=tors,
+        relations=relations,
+        host_map=host_map,
+    )
+    runtime.start()
+    runtime.join()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    asyncio.run(main(args))
+    args = __parse_args()
+    __main(args)

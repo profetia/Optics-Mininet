@@ -1,4 +1,3 @@
-import anyio
 import numpy as np
 import socket
 import struct
@@ -16,18 +15,18 @@ class ReportEntry:
         return f"target: {self.target}, count: {self.count}"
 
 
-class __TrafficCollectorImpl:
+class Report:
 
     def __init__(
         self,
         hosts: Sequence[str],
         tors: Sequence[str],
-        relaions: Mapping[str, str],
+        relations: Mapping[str, str],
         host_map: Optional[Mapping[str, str]] = None,
     ):
         self.__hosts = hosts
         self.__tors = tors
-        self.__relations = relaions
+        self.__relations = relations
 
         if host_map is None:
             host_map = {host: host for host in hosts}
@@ -37,10 +36,10 @@ class __TrafficCollectorImpl:
         self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
         self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
-    def update(self, source: str, report: Sequence[ReportEntry]) -> np.ndarray:
+    def update(self, source: str, report_entries: Sequence[ReportEntry]) -> np.ndarray:
         real_source = self.__host_map[source]
         source_tor = self.__relations[real_source]
-        for entry in report:
+        for entry in report_entries:
             target_tor = self.__relations[entry.target]
             self.__matrix[self.__tors.index(source_tor)][
                 self.__tors.index(target_tor)
@@ -48,23 +47,3 @@ class __TrafficCollectorImpl:
             self.__traffic[real_source][entry.target] = entry.count
 
         return self.__matrix
-
-
-async def TrafficCollector(
-    hosts: Sequence[str],
-    tors: Sequence[str],
-    relations: Mapping[str, str],
-    host_map: Optional[Mapping[str, str]] = None,
-    host: str = "0.0.0.0",
-    port: int = 1599,
-):
-    traffic_collector_impl = __TrafficCollectorImpl(hosts, tors, relations, host_map)
-    async with await anyio.create_udp_socket(
-        family=socket.AF_INET, local_host=host, local_port=port
-    ) as udp:
-        async for packet, (source, _) in udp:
-            entry_size = struct.calcsize("QII")
-            report_len = len(packet) // entry_size
-
-            report = [ReportEntry(packet, i * entry_size) for i in range(report_len)]
-            yield traffic_collector_impl.update(source, report)
