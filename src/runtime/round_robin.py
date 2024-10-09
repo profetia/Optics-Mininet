@@ -1,6 +1,46 @@
 import argparse
+import time
+import numpy as np
+
+from typing import Optional
+
+import runtime
 
 from runtime import Runtime
+
+
+class __RoundRobinTrigger:
+
+    def __init__(self, n_tors: int, slice_duration_us: int):
+        self.n_tors = n_tors
+        self.slice_duration_us = slice_duration_us
+
+        self.start = time.time()
+        self.last_index = None
+
+    def __call__(self, matrix: np.array) -> Optional[int]:
+        elapsed = (time.time() - self.start) * 1000_000 / self.slice_duration_us
+        new_index = int(elapsed) % self.n_tors
+        if self.last_index is not None and new_index == self.last_index:
+            return None
+
+        self.last_index = new_index
+        return new_index
+
+
+class __RoundRobinSchedule:
+
+    def __init__(self, n_tors: int):
+        self.schedules = []
+
+        for shift in range(n_tors):
+            schedule = np.full((n_tors, n_tors), 0, dtype=int)
+            for i in range(n_tors):
+                schedule[i][(i + shift) % n_tors] = 1
+            self.schedules.append(schedule)
+
+    def __call__(self, matrix: np.array, auxiliary: int, **kwargs) -> np.array:
+        return self.schedules[auxiliary]
 
 
 def __parse_args() -> argparse.Namespace:
@@ -77,17 +117,20 @@ def __main(args: argparse.Namespace) -> None:
         host_x17_mapped: host_x17,
     }
 
-    runtime = Runtime(
-        trigger_fn=print,
-        schedule_fn=print,
+    worker = Runtime(
+        trigger_fn=__RoundRobinTrigger(
+            8, runtime.SLICE_DURATION_US * runtime.N_SLICES * 10 * 50
+        ),
+        schedule_fn=__RoundRobinSchedule(8),
         host=args.address,
         port=args.port,
+        # event_only=True,
         report_kwargs=dict(
             hosts=hosts, tors=tors, relations=relations, host_map=host_map
         ),
     )
-    runtime.start()
-    runtime.join()
+    worker.start()
+    worker.join()
 
 
 if __name__ == "__main__":

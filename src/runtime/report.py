@@ -47,3 +47,6 @@ class Report:
             self.__traffic[real_source][entry.target] = entry.count
 
         return self.__matrix
+
+    def matrix(self) -> np.ndarray:
+        return self.__matrix

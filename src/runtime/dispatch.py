@@ -6,7 +6,7 @@ import xmlrpc.client
 
 def pause_flow(url: str):
     with xmlrpc.client.ServerProxy(
-        uri=f"http://{args.url}/",
+        uri=f"http://{url}/",
         allow_none=True,
     ) as proxy:
         proxy.pause_flow()
