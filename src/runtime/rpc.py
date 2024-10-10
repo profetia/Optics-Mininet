@@ -3,17 +3,13 @@ import grpc
 import numpy as np
 
 
-from proto.rpc_pb2 import (
-    PauseFlowRequest,
-    SetAfcTableEntry,
-    ResumeFlowRequest,
-    HohoLookupSendSliceTableEntry,
-    SliceToDirectTorIpTableEntry,
-)
+from proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest
 from proto.rpc_pb2_grpc import RpcStub
 
 import stub.collect as collect
 import stub.util as util
+
+import time
 
 
 class Client:
@@ -28,56 +24,35 @@ class Client:
 
     def __del__(self):
         for channel in self.channels:
-            channel.close()
+            asyncio.create_task(channel.close())
 
     async def __pause_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
-        stub = self.stubs[tor_id]
         set_afc_entries = collect.pause_flow_impl(tor_id, schedule)
-        request = PauseFlowRequest(
-            set_afc_table_entries=[
-                SetAfcTableEntry(**entry) for entry in set_afc_entries
-            ]
-        )
-        await stub.PauseFlow(request)
+        request = PauseFlowRequest(set_afc_table_entries=set_afc_entries)
+
+        await self.stubs[tor_id].PauseFlow(request)
 
     async def pause_flow(self, schedule: np.ndarray) -> None:
+        await asyncio.gather(
+            *[self.__pause_flow_impl(tor_id, schedule) for tor_id in range(4)]
+        )
 
-        futures = []
-        for tor_id in range(4):
-            futures.append(
-                self.executor.submit(self.__pause_flow_impl, tor_id, schedule)
-            )
+    async def __resume_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
 
-        for future in futures:
-            future.result()
-
-    def __resume_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
-        stub = self.stubs[tor_id]
         hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries = (
             collect.resume_flow_impl(tor_id, schedule)
         )
-
         request = ResumeFlowRequest(
-            hoho_lookup_send_slice_table_entries=[
-                HohoLookupSendSliceTableEntry(**entry)
-                for entry in hoho_lookup_send_slice_entries
-            ],
-            slice_to_direct_tor_ip_table_entries=[
-                SliceToDirectTorIpTableEntry(**entry)
-                for entry in slice_to_direct_tor_ip_entries
-            ],
+            hoho_lookup_send_slice_table_entries=hoho_lookup_send_slice_entries,
+            slice_to_direct_tor_ip_table_entries=slice_to_direct_tor_ip_entries,
         )
-        stub.ResumeFlow(request)
 
-    def resume_flow(self, schedule: np.ndarray) -> None:
-        futures = []
-        for tor_id in range(4):
-            futures.append(
-                self.executor.submit(self.__resume_flow_impl, tor_id, schedule)
-            )
+        await self.stubs[tor_id].ResumeFlow(request)
 
-        for future in futures:
-            future.result()
+    async def resume_flow(self, schedule: np.ndarray) -> None:
+        await asyncio.gather(
+            *[self.__resume_flow_impl(tor_id, schedule) for tor_id in range(4)]
+        )
 
 
 Hosts = {
@@ -85,14 +60,20 @@ Hosts = {
     "switch6-neptune": "10.0.13.24",
 }
 
-if __name__ == "__main__":
-    import time
 
+async def __main():
     cli = Client(url=Hosts["switch6-neptune"])
 
     start = time.time_ns()
-    cli.pause_flow(util.default_schedule)
-    cli.resume_flow(util.default_schedule)
-    end = time.time_ns()
 
+    await asyncio.gather()
+
+    await cli.pause_flow(util.default_schedule)
+    await cli.resume_flow(util.default_schedule)
+
+    end = time.time_ns()
     print(f"Time elapsed: {(end - start) / 1_000_000} ms")
+
+
+if __name__ == "__main__":
+    asyncio.run(__main())

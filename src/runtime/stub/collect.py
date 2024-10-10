@@ -6,6 +6,12 @@ from . import afc
 from . import consts
 from . import util
 
+from runtime.proto.rpc_pb2 import (
+    SetAfcTableEntry,
+    HohoLookupSendSliceTableEntry,
+    SliceToDirectTorIpTableEntry,
+)
+
 
 def __ipv4_to_int(ipv4: str):
     # Convert IPv4 string to a packed binary format
@@ -18,12 +24,12 @@ def pause_flow_impl(tor_id: int, schedule: np.ndarray):
 
     def pause_port_queue_at_slice(port, queue, slice_id, app_id):
         pause_afc_msg = afc.gen_pause_afc_msg(tor_id, port, queue)
-        return {
-            "app_id": app_id,
-            "slice_id": slice_id,
-            "packet_id": 1,
-            "afc_msg": int.from_bytes(bytes(pause_afc_msg), "big"),
-        }
+        return SetAfcTableEntry(
+            app_id=app_id,
+            slice_id=slice_id,
+            packet_id=1,
+            afc_msg=int.from_bytes(bytes(pause_afc_msg), "big"),
+        )
 
     set_afc_entries = []
     set_afc_entries.append(
@@ -48,16 +54,16 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
         )
         for cur_slice, send_slice, port in port_slice_id:
             hoho_lookup_send_slice_entries.append(
-                {
-                    "cur_slice": cur_slice,
-                    "dst_group": dst + 0x10,
-                    "port": port,
-                    "next_tor": dst + 0x10,
-                    "slot": send_slice,
-                    "alternate_port": port,
-                    "alternate_next_tor": dst + 0x10,
-                    "alternate_slot": send_slice,
-                }
+                HohoLookupSendSliceTableEntry(
+                    cur_slice=cur_slice,
+                    dst_group=dst + 0x10,
+                    port=port,
+                    next_tor=dst + 0x10,
+                    slot=send_slice,
+                    alternate_port=port,
+                    alternate_next_tor=dst + 0x10,
+                    alternate_slot=send_slice,
+                )
             )
 
     slice_to_direct_tor_ip_entries = []
@@ -67,7 +73,7 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
         )
         host_ipv4 = __ipv4_to_int(consts.host_ip[target_id])
         slice_to_direct_tor_ip_entries.append(
-            {"cur_slice": slice_id, "tor_ip": host_ipv4}
+            SliceToDirectTorIpTableEntry(cur_slice=slice_id, tor_ip=host_ipv4)
         )
 
     # print(f"Resume flow for tor {tor_id}")
