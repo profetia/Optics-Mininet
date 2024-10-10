@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+message HohoLookupSendSliceTableEntry {
+    uint64 cur_slice = 1;
+    uint64 dst_group = 2;
+    uint64 port = 3;
+    uint64 next_tor = 4;
+    uint64 slot = 5;
+    uint64 alternate_port = 6;
+    uint64 alternate_next_tor = 7;
+    uint64 alternate_slot = 8;
+}
+
+message SetAfcTableEntry {
+    uint64 app_id = 1;
+    uint64 slice_id = 2;
+    uint64 packet_id = 3;
+    uint64 afc_msg = 4;
+}
+
+message SliceToDirectTorIpTableEntry {
+    uint64 cur_slice = 1;
+    uint64 tor_ip = 2;
+}
+
+message PauseFlowRequest {
+    repeated SetAfcTableEntry set_afc_table_entries = 2;
+}
+
+message PauseFlowResponse {
+    uint32 err = 1;
+}
+
+message ResumeFlowRequest {
+    repeated HohoLookupSendSliceTableEntry hoho_lookup_send_slice_table_entries = 2;
+    repeated SliceToDirectTorIpTableEntry slice_to_direct_tor_ip_table_entries = 3;
+}
+
+message ResumeFlowResponse {
+    uint32 err = 1;
+}
+
+service Rpc {
+
+rpc PauseFlow(PauseFlowRequest) returns (PauseFlowResponse) {}
+
+rpc ResumeFlow(ResumeFlowRequest) returns (ResumeFlowResponse) {}
+
+}
