@@ -4,9 +4,9 @@ import numpy as np
 
 from typing import Optional
 
-import runtime
+import impl
 
-from runtime import Runtime
+from impl import Runtime
 
 
 class __RoundRobinTrigger:
@@ -119,7 +119,7 @@ def __main(args: argparse.Namespace) -> None:
 
     worker = Runtime(
         trigger_fn=__RoundRobinTrigger(
-            8, runtime.SLICE_DURATION_US * runtime.N_SLICES * 10 * 50
+            8, impl.SLICE_DURATION_US * impl.N_SLICES * 10 * 50
         ),
         schedule_fn=__RoundRobinSchedule(8),
         host=args.address,
