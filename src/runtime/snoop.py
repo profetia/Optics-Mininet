@@ -1,9 +1,26 @@
 import argparse
+import numpy as np
 
-from runtime import Runtime
+from typing import Any
+
+from runtime import impl
 
 
-def __parse_args() -> argparse.Namespace:
+def NoopScheduler():
+    def schedule(matrix: np.array, auxiliary: Any):
+        pass
+
+    return schedule
+
+
+def PrintEventHandler():
+    def handle_event(counter: int, matrix: np.ndarray):
+        print(f"|------- Event {counter} -------|\n{matrix}\n")
+
+    return handle_event
+
+
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="opsys_control")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
@@ -14,7 +31,7 @@ def __parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def __main(args: argparse.Namespace) -> None:
+def main(args: argparse.Namespace) -> None:
     host_x10 = "10.29.1.110"
     host_x11 = "10.29.1.111"
     host_x12 = "10.29.1.120"
@@ -57,39 +74,45 @@ def __main(args: argparse.Namespace) -> None:
         host_x17: tor_7,
     }
 
-    host_x10_mapped = "172.16.11.10"
-    host_x11_mapped = "172.16.11.11"
-    host_x12_mapped = "172.16.12.10"
-    host_x13_mapped = "172.16.12.11"
-    host_x14_mapped = "172.16.13.10"
-    host_x15_mapped = "172.16.13.11"
-    host_x16_mapped = "172.16.14.10"
-    host_x17_mapped = "172.16.14.11"
+    # host_x10_mapped = "172.16.11.10"
+    # host_x11_mapped = "172.16.11.11"
+    # host_x12_mapped = "172.16.12.10"
+    # host_x13_mapped = "172.16.12.11"
+    # host_x14_mapped = "172.16.13.10"
+    # host_x15_mapped = "172.16.13.11"
+    # host_x16_mapped = "172.16.14.10"
+    # host_x17_mapped = "172.16.14.11"
 
-    host_map = {
-        host_x10_mapped: host_x10,
-        host_x11_mapped: host_x11,
-        host_x12_mapped: host_x12,
-        host_x13_mapped: host_x13,
-        host_x14_mapped: host_x14,
-        host_x15_mapped: host_x15,
-        host_x16_mapped: host_x16,
-        host_x17_mapped: host_x17,
-    }
+    # host_map = {
+    #     host_x10_mapped: host_x10,
+    #     host_x11_mapped: host_x11,
+    #     host_x12_mapped: host_x12,
+    #     host_x13_mapped: host_x13,
+    #     host_x14_mapped: host_x14,
+    #     host_x15_mapped: host_x15,
+    #     host_x16_mapped: host_x16,
+    #     host_x17_mapped: host_x17,
+    # }
+    host_map = None
 
-    runtime = Runtime(
-        trigger_fn=print,
-        schedule_fn=print,
-        host=args.address,
-        port=args.port,
-        report_kwargs=dict(
-            hosts=hosts, tors=tors, relations=relations, host_map=host_map
+    runtime = impl.Runtime(
+        NoopScheduler(),
+        impl.Config(
+            (args.address, args.port),
+            dict(
+                hosts=hosts,
+                tors=tors,
+                relations=relations,
+                host_map=host_map,
+            ),
         ),
     )
-    runtime.start()
-    runtime.join()
+
+    runtime.add_event_handler(PrintEventHandler())
+
+    runtime.run()
 
 
 if __name__ == "__main__":
-    args = __parse_args()
-    __main(args)
+    args = parse_args()
+    main(args)
