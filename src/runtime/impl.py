@@ -11,7 +11,7 @@ from typing import Any, Callable, List, Optional, Tuple
 import common
 
 from rpc import Client, Host
-from runtime.report import Report, ReportEntry
+from runtime.report import Report, ReportHeader, ReportEntry
 from stub import consts
 
 EventHandler = Callable[[int, np.ndarray], Optional[Any]]
@@ -117,13 +117,18 @@ def collect_daemon(
 
     while True:
         try:
-            data, (source, _) = udp.recvfrom(1024)
+            data, (source, _) = udp.recvfrom(1024 + len(ReportHeader))
         except BlockingIOError:
             continue
 
-        report_entries_len = len(data) // ENTRY_SIZE
+        # the first 16 bytes are the header, extract as a 16 of bytes
+        header, payload = data[: len(ReportHeader)], data[len(ReportHeader) :]
+        if header != ReportHeader:
+            continue
+
+        report_entries_len = len(payload) // ENTRY_SIZE
         report_entries = [
-            ReportEntry(data, i * ENTRY_SIZE) for i in range(report_entries_len)
+            ReportEntry(payload, i * ENTRY_SIZE) for i in range(report_entries_len)
         ]
 
         updated = report.update(source, report_entries)
@@ -173,7 +178,7 @@ async def schedule_daemon_impl(
         topology = scheduler(matrix, auxiliary)
         schedule = translate_matrix(topology)
 
-        # with common.timing("Pause and resume flow"):
+        # with common.timing("schedule_daemon_impl"):
         await asyncio.gather(
             *clients[0].pause_and_resume_flow_unchecked(schedule),
             *clients[1].pause_and_resume_flow_unchecked(schedule),

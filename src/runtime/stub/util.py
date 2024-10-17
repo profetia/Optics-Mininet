@@ -19,7 +19,10 @@ electrical_port = 0xAA
 
 
 def find_direct_port_slice_or_electrical(
-    src: int, dst: int, schedule: np.ndarray = default_schedule
+    src: int,
+    dst: int,
+    is_hardcoded: bool = False,
+    schedule=default_schedule,
 ):
     coloum = src * PORT_NUM
     # print(schedule.T[coloum])
@@ -41,10 +44,10 @@ def find_direct_port_slice_or_electrical(
             for slice_id in range(SLICE_NUM):
                 if connection_for_port[port][slice_id] == dst:  # there is direct link
                     slice_port.append((slice_id, slice_id, port))
-                else:
+                elif not is_hardcoded:
                     slice_port.append((slice_id, start, electrical_port))
 
-    if len(slice_port) == 0:
+    if len(slice_port) == 0 and not is_hardcoded:
         # print(f"src {src} dst {dst} electrical")
         for slice_id in range(SLICE_NUM):
             slice_port.append((slice_id, slice_id, electrical_port))

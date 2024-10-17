@@ -6,6 +6,28 @@ from collections import defaultdict
 from typing import Optional, Sequence, Mapping
 
 
+ReportHeader = bytes(
+    [
+        0xAB,
+        0xBC,
+        0xCD,
+        0x00,
+        0xDE,
+        0xEF,
+        0xFA,
+        0x00,
+        0xFE,
+        0xED,
+        0xDC,
+        0x00,
+        0xCA,
+        0xBA,
+        0xAF,
+        0x00,
+    ]
+)
+
+
 class ReportEntry:
     def __init__(self, buffer: bytes, offset: int):
         self.count, tor, _ = struct.unpack_from("QII", buffer, offset)

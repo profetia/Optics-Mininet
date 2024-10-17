@@ -50,7 +50,10 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
             continue
 
         port_slice_id = util.find_direct_port_slice_or_electrical(
-            tor_id, dst, schedule=schedule
+            tor_id,
+            dst,
+            is_hardcoded=True,
+            schedule=schedule,
         )
         for cur_slice, send_slice, port in port_slice_id:
             hoho_lookup_send_slice_entries.append(

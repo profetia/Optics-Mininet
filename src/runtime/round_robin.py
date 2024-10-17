@@ -114,7 +114,7 @@ def main(args: argparse.Namespace) -> None:
         host_x17_mapped: host_x17,
     }
 
-    time_slice_us = impl.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 50
+    time_slice_us = impl.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 25
 
     runtime = impl.Runtime(
         RoundRobinScheduler(8),
