@@ -2,15 +2,27 @@ import argparse
 import time
 import numpy as np
 
-from typing import Optional
+from typing import Any, Optional
 
 import impl
+import stub.consts as consts
 
-from impl import Runtime
+
+class RoundRobinScheduler:
+    def __init__(self, n_tors: int):
+        self.schedules = []
+
+        for shift in range(1, n_tors):
+            schedule = np.full((n_tors, n_tors), 0, dtype=int)
+            for i in range(n_tors):
+                schedule[i][(i + shift) % n_tors] = 1
+            self.schedules.append(schedule)
+
+    def __call__(self, matrix: np.array, auxiliary: Any) -> np.array:
+        return self.schedules[auxiliary]
 
 
-class __RoundRobinTrigger:
-
+class RoundRobinTimingHandler:
     def __init__(self, n_tors: int, slice_duration_us: int):
         self.n_tors = n_tors
         self.slice_duration_us = slice_duration_us
@@ -18,9 +30,9 @@ class __RoundRobinTrigger:
         self.start = time.time()
         self.last_index = None
 
-    def __call__(self, matrix: np.array) -> Optional[int]:
-        elapsed = (time.time() - self.start) * 1000_000 / self.slice_duration_us
-        new_index = int(elapsed) % self.n_tors
+    def __call__(self, now: float, matrix: np.array) -> Optional[int]:
+        elapsed = (now - self.start) * 1000_000 / self.slice_duration_us
+        new_index = int(elapsed) % (self.n_tors - 1)
         if self.last_index is not None and new_index == self.last_index:
             return None
 
@@ -28,22 +40,7 @@ class __RoundRobinTrigger:
         return new_index
 
 
-class __RoundRobinSchedule:
-
-    def __init__(self, n_tors: int):
-        self.schedules = []
-
-        for shift in range(n_tors):
-            schedule = np.full((n_tors, n_tors), 0, dtype=int)
-            for i in range(n_tors):
-                schedule[i][(i + shift) % n_tors] = 1
-            self.schedules.append(schedule)
-
-    def __call__(self, matrix: np.array, auxiliary: int, **kwargs) -> np.array:
-        return self.schedules[auxiliary]
-
-
-def __parse_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="opsys_control")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
@@ -54,7 +51,7 @@ def __parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def __main(args: argparse.Namespace) -> None:
+def main(args: argparse.Namespace) -> None:
     host_x10 = "10.29.1.110"
     host_x11 = "10.29.1.111"
     host_x12 = "10.29.1.120"
@@ -117,22 +114,29 @@ def __main(args: argparse.Namespace) -> None:
         host_x17_mapped: host_x17,
     }
 
-    worker = Runtime(
-        trigger_fn=__RoundRobinTrigger(
-            8, impl.SLICE_DURATION_US * impl.N_SLICES * 10 * 50
-        ),
-        schedule_fn=__RoundRobinSchedule(8),
-        host=args.address,
-        port=args.port,
-        # event_only=True,
-        report_kwargs=dict(
-            hosts=hosts, tors=tors, relations=relations, host_map=host_map
+    time_slice_us = impl.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 50
+
+    runtime = impl.Runtime(
+        RoundRobinScheduler(8),
+        impl.Config(
+            (args.address, args.port),
+            dict(
+                hosts=hosts,
+                tors=tors,
+                relations=relations,
+                host_map=host_map,
+            ),
         ),
     )
-    worker.start()
-    worker.join()
+
+    runtime.add_timing_handler(
+        dict(interval=time_slice_us / 1e6),
+        RoundRobinTimingHandler(8, time_slice_us),
+    )
+
+    runtime.run()
 
 
 if __name__ == "__main__":
-    args = __parse_args()
-    __main(args)
+    args = parse_args()
+    main(args)

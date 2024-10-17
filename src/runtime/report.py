@@ -36,17 +36,29 @@ class Report:
         self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
         self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
-    def update(self, source: str, report_entries: Sequence[ReportEntry]) -> np.ndarray:
+        self.__counter = 0
+
+    def update(self, source: str, report_entries: Sequence[ReportEntry]) -> int:
         real_source = self.__host_map[source]
         source_tor = self.__relations[real_source]
+
+        modified: int = 0
         for entry in report_entries:
             target_tor = self.__relations[entry.target]
+            delta = entry.count - self.__traffic[real_source][entry.target]
             self.__matrix[self.__tors.index(source_tor)][
                 self.__tors.index(target_tor)
-            ] += (entry.count - self.__traffic[real_source][entry.target])
+            ] += delta
+            modified += abs(delta)
             self.__traffic[real_source][entry.target] = entry.count
 
-        return self.__matrix
+        if modified:
+            self.__counter += 1
+
+        return modified
 
     def matrix(self) -> np.ndarray:
         return self.__matrix
+
+    def counter(self) -> int:
+        return self.__counter
