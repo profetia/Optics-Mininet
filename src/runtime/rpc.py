@@ -35,17 +35,17 @@ class Client:
         for channel in self.channels:
             await channel.close()
 
-    async def __pause_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
-        set_afc_entries = collect.pause_flow_impl(tor_id, schedule)
+    async def __pause_flow_impl(self, tor_id: int) -> None:
+        set_afc_entries = collect.pause_flow_impl(tor_id)
         request = PauseFlowRequest(set_afc_table_entries=set_afc_entries)
 
         await self.stubs[tor_id % 4].PauseFlow(request)
 
-    def pause_flow_unchecked(self, schedule: np.ndarray) -> List[Awaitable[None]]:
-        return [self.__pause_flow_impl(tor_id, schedule) for tor_id in self.tor_range]
+    def pause_flow_unchecked(self) -> List[Awaitable[None]]:
+        return [self.__pause_flow_impl(tor_id) for tor_id in self.tor_range]
 
-    async def pause_flow(self, schedule: np.ndarray) -> None:
-        await asyncio.gather(*self.pause_flow_unchecked(schedule))
+    async def pause_flow(self) -> None:
+        await asyncio.gather(*self.pause_flow_unchecked())
 
     async def __resume_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
         hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries = (
@@ -67,7 +67,7 @@ class Client:
     async def __pause_and_resume_flow_impl(
         self, tor_id: int, schedule: np.ndarray
     ) -> None:
-        await self.__pause_flow_impl(tor_id, schedule)
+        await self.__pause_flow_impl(tor_id)
         await self.__resume_flow_impl(tor_id, schedule)
 
     def pause_and_resume_flow_unchecked(
@@ -90,13 +90,13 @@ async def main():
 
     neptune = Client(host=Host.Neptune)
     with common.timing("Neptune"):
-        await neptune.pause_flow(schedule)
+        await neptune.pause_flow()
         await neptune.resume_flow(schedule)
     await neptune.close()
 
     uranus = Client(host=Host.Uranus)
     with common.timing("Uranus"):
-        await uranus.pause_flow(schedule)
+        await uranus.pause_flow()
         await uranus.resume_flow(schedule)
     await uranus.close()
 
@@ -106,3 +106,7 @@ if __name__ == "__main__":
 
     uvloop.install()
     asyncio.run(main())
+
+    # import cProfile
+
+    # cProfile.run("asyncio.run(main())", sort="cumtime")

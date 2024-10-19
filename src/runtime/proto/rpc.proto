@@ -24,18 +24,14 @@ message PauseFlowRequest {
     repeated SetAfcTableEntry set_afc_table_entries = 2;
 }
 
-message PauseFlowResponse {
-    uint32 err = 1;
-}
+message PauseFlowResponse {}
 
 message ResumeFlowRequest {
     repeated HohoLookupSendSliceTableEntry hoho_lookup_send_slice_table_entries = 2;
     repeated SliceToDirectTorIpTableEntry slice_to_direct_tor_ip_table_entries = 3;
 }
 
-message ResumeFlowResponse {
-    uint32 err = 1;
-}
+message ResumeFlowResponse {}
 
 service Rpc {
 

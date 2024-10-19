@@ -1,4 +1,6 @@
 import numpy as np
+import numpy.typing as npt
+import numba
 
 import common
 
@@ -20,20 +22,24 @@ default_schedule = np.loadtxt(
 electrical_port = 0xAA
 
 
+@numba.jit(nopython=True, cache=True)
 def find_direct_port_slice_or_hardcoded_electrical(
-    src: int, dst: int, schedule=default_schedule
+    src: int, dst: int, schedule: npt.NDArray[int] = default_schedule
 ):
     coloum = src * PORT_NUM
 
-    connection_for_port = schedule[coloum : coloum + PORT_NUM].tolist()
-
+    connection_for_port = schedule[coloum : coloum + PORT_NUM]
     slice_port = []
 
     for port, dst_list in enumerate(connection_for_port):
-        if dst in dst_list:
-            for slice_id in range(SLICE_NUM):
-                if connection_for_port[port][slice_id] == dst:  # there is direct link
-                    slice_port.append((slice_id, slice_id, port))
+        if dst not in dst_list:
+            continue
+
+        for slice_id in range(SLICE_NUM):
+            if dst_list[slice_id] != dst:  # there is direct link
+                continue
+
+            slice_port.append((slice_id, slice_id, port))
 
     return slice_port
 

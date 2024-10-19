@@ -44,7 +44,7 @@ for tor_id in range(consts.TOR_NUM):
     __afc_entries_cache.append(set_afc_entries)
 
 
-def pause_flow_impl(tor_id: int, schedule: np.ndarray):
+def pause_flow_impl(tor_id: int):
     # set_afc_entries = []
     # set_afc_entries.append(
     #     __pause_port_queue_at_slice(tor_id, port=0, queue=0, slice_id=0, app_id=1)
@@ -84,17 +84,16 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
                 )
             )
 
-    slice_to_direct_tor_ip_entries = []
-    for slice_id in range(consts.SLICE_NUM):
-        target_id = util.find_new_slice_ta(
-            src=tor_id, port=0, time_slice=slice_id, schedule=schedule
+    slice_to_direct_tor_ip_entries = [
+        SliceToDirectTorIpTableEntry(
+            cur_slice=slice_id,
+            tor_ip=__host_ipv4_cache[
+                util.find_new_slice_ta(
+                    src=tor_id, port=0, time_slice=slice_id, schedule=schedule
+                )
+            ],
         )
-        # host_ipv4 = __ipv4_to_int(consts.host_ip[target_id])
-        host_ipv4 = __host_ipv4_cache[target_id]
-        slice_to_direct_tor_ip_entries.append(
-            SliceToDirectTorIpTableEntry(cur_slice=slice_id, tor_ip=host_ipv4)
-        )
-
-    # print(f"Resume flow for tor {tor_id}")
+        for slice_id in range(consts.SLICE_NUM)
+    ]
 
     return hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries
