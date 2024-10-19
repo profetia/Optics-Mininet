@@ -154,7 +154,7 @@ def schedule_daemon(
 def translate_matrix(matrix: np.ndarray) -> np.ndarray:
     n_tors, n_ports = matrix.shape
 
-    schedule = np.full((consts.SLICE_NUM, n_tors * consts.PORT_NUM), -1, dtype=int)
+    schedule = np.full((n_tors * consts.PORT_NUM, consts.SLICE_NUM), -1, dtype=int)
 
     for i, row in enumerate(matrix):
         for j, value in enumerate(row):
@@ -162,7 +162,7 @@ def translate_matrix(matrix: np.ndarray) -> np.ndarray:
                 continue
 
             column = i * consts.PORT_NUM
-            schedule[:, column] = j
+            schedule[column, :] = j
 
     return schedule
 

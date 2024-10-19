@@ -6,6 +6,8 @@ from . import afc
 from . import consts
 from . import util
 
+import common
+
 from runtime.proto.rpc_pb2 import (
     SetAfcTableEntry,
     HohoLookupSendSliceTableEntry,
@@ -20,27 +22,46 @@ def __ipv4_to_int(ipv4: str):
     return struct.unpack("!I", packed_ip)[0]
 
 
-def pause_flow_impl(tor_id: int, schedule: np.ndarray):
+def __pause_port_queue_at_slice(tor_id, port, queue, slice_id, app_id):
+    pause_afc_msg = afc.gen_pause_afc_msg(tor_id, port, queue)
+    return SetAfcTableEntry(
+        app_id=app_id,
+        slice_id=slice_id,
+        packet_id=1,
+        afc_msg=int.from_bytes(bytes(pause_afc_msg), "big"),
+    )
 
-    def pause_port_queue_at_slice(port, queue, slice_id, app_id):
-        pause_afc_msg = afc.gen_pause_afc_msg(tor_id, port, queue)
-        return SetAfcTableEntry(
-            app_id=app_id,
-            slice_id=slice_id,
-            packet_id=1,
-            afc_msg=int.from_bytes(bytes(pause_afc_msg), "big"),
-        )
 
+__afc_entries_cache = []
+for tor_id in range(consts.TOR_NUM):
     set_afc_entries = []
     set_afc_entries.append(
-        pause_port_queue_at_slice(port=0, queue=0, slice_id=0, app_id=1)
+        __pause_port_queue_at_slice(tor_id, port=0, queue=0, slice_id=0, app_id=1)
     )
     set_afc_entries.append(
-        pause_port_queue_at_slice(port=0, queue=0, slice_id=0, app_id=3)
+        __pause_port_queue_at_slice(tor_id, port=0, queue=0, slice_id=0, app_id=3)
     )
-    # print(f"Pause port 0 queue 0 at slice {0}")
+    __afc_entries_cache.append(set_afc_entries)
+
+
+def pause_flow_impl(tor_id: int, schedule: np.ndarray):
+    # set_afc_entries = []
+    # set_afc_entries.append(
+    #     __pause_port_queue_at_slice(tor_id, port=0, queue=0, slice_id=0, app_id=1)
+    # )
+    # set_afc_entries.append(
+    #     __pause_port_queue_at_slice(tor_id, port=0, queue=0, slice_id=0, app_id=3)
+    # )
+
+    set_afc_entries = __afc_entries_cache[tor_id]
 
     return set_afc_entries
+
+
+__host_ipv4_cache = []
+for ip in consts.host_ip:
+    host_ipv4 = __ipv4_to_int(ip)
+    __host_ipv4_cache.append(host_ipv4)
 
 
 def resume_flow_impl(tor_id: int, schedule: np.ndarray):
@@ -49,11 +70,8 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
         if dst == tor_id:
             continue
 
-        port_slice_id = util.find_direct_port_slice_or_electrical(
-            tor_id,
-            dst,
-            is_hardcoded=True,
-            schedule=schedule,
+        port_slice_id = util.find_direct_port_slice_or_hardcoded_electrical(
+            tor_id, dst, schedule=schedule
         )
         for cur_slice, send_slice, port in port_slice_id:
             hoho_lookup_send_slice_entries.append(
@@ -63,9 +81,6 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
                     port=port,
                     next_tor=dst + 0x10,
                     slot=send_slice,
-                    alternate_port=port,
-                    alternate_next_tor=dst + 0x10,
-                    alternate_slot=send_slice,
                 )
             )
 
@@ -74,7 +89,8 @@ def resume_flow_impl(tor_id: int, schedule: np.ndarray):
         target_id = util.find_new_slice_ta(
             src=tor_id, port=0, time_slice=slice_id, schedule=schedule
         )
-        host_ipv4 = __ipv4_to_int(consts.host_ip[target_id])
+        # host_ipv4 = __ipv4_to_int(consts.host_ip[target_id])
+        host_ipv4 = __host_ipv4_cache[target_id]
         slice_to_direct_tor_ip_entries.append(
             SliceToDirectTorIpTableEntry(cur_slice=slice_id, tor_ip=host_ipv4)
         )

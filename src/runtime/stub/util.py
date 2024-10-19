@@ -1,5 +1,7 @@
 import numpy as np
 
+import common
+
 PORT_NUM = 4
 TOR_NUM = 8
 RANK_NUM = int(TOR_NUM / PORT_NUM)
@@ -13,9 +15,27 @@ SLICE_PER_CONNECTION = PORT_NUM * 2
 default_schedule = np.loadtxt(
     "runtime/8tors_1ports_schedule.txt",
     dtype=int,
-)
+).T
 
 electrical_port = 0xAA
+
+
+def find_direct_port_slice_or_hardcoded_electrical(
+    src: int, dst: int, schedule=default_schedule
+):
+    coloum = src * PORT_NUM
+
+    connection_for_port = schedule[coloum : coloum + PORT_NUM].tolist()
+
+    slice_port = []
+
+    for port, dst_list in enumerate(connection_for_port):
+        if dst in dst_list:
+            for slice_id in range(SLICE_NUM):
+                if connection_for_port[port][slice_id] == dst:  # there is direct link
+                    slice_port.append((slice_id, slice_id, port))
+
+    return slice_port
 
 
 def find_direct_port_slice_or_electrical(
@@ -26,7 +46,7 @@ def find_direct_port_slice_or_electrical(
 ):
     coloum = src * PORT_NUM
     # print(schedule.T[coloum])
-    connection_for_port = schedule.T[coloum : coloum + PORT_NUM].tolist()
+    connection_for_port = schedule[coloum : coloum + PORT_NUM].tolist()
 
     # print(connection_for_port)
 
@@ -55,31 +75,6 @@ def find_direct_port_slice_or_electrical(
     return slice_port
 
 
-def find_pause_slice(
-    src: int, port: int, queue: int, schedule: np.ndarray = default_schedule
-):
-    assert 0 <= src <= TOR_NUM
-    assert 0 <= port <= PORT_NUM
-    assert 0 <= queue <= Q_NUM
-
-    coloum = src * PORT_NUM + port
-    # print(schedule.T[coloum])
-    connection_for_port = schedule.T[coloum].tolist()
-
-    # print(connection_for_port)
-    start_slice = SLICE_PER_CONNECTION * queue
-    end_slice = start_slice + SLICE_PER_CONNECTION
-
-    # print(f"start_slice is {start_slice}, end_slice is {end_slice}")
-    # print(f"connection for port is {connection_for_port}")
-
-    paused_slice = connection_for_port.index(-1, start_slice, end_slice)
-
-    # print(f"Find paused slice {paused_slice}")
-
-    return paused_slice
-
-
 def find_new_slice_ta(src: int, port: int, time_slice: int, schedule=default_schedule):
     column = src * PORT_NUM + port
-    return schedule[time_slice][column]
+    return schedule[column, time_slice]

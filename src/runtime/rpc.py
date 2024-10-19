@@ -86,7 +86,7 @@ async def main():
     schedule = np.loadtxt(
         "runtime/8tors_1ports_test.txt",
         dtype=int,
-    )
+    ).T
 
     cli = Client(host=Host.Neptune)
     with common.timing("Neptune"):

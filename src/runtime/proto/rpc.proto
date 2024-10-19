@@ -6,9 +6,6 @@ message HohoLookupSendSliceTableEntry {
     uint64 port = 3;
     uint64 next_tor = 4;
     uint64 slot = 5;
-    uint64 alternate_port = 6;
-    uint64 alternate_next_tor = 7;
-    uint64 alternate_slot = 8;
 }
 
 message SetAfcTableEntry {
