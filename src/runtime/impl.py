@@ -4,6 +4,7 @@ import numpy as np
 import socket
 import struct
 import time
+import uvloop
 
 from multiprocessing import Process, Queue
 from typing import Any, Callable, List, Optional, Tuple
@@ -148,7 +149,16 @@ def schedule_daemon(
     channel: Queue,
     scheduler: Scheduler,
 ) -> None:
-    asyncio.run(schedule_daemon_impl(channel, scheduler))
+    uvloop.install()
+    with asyncio.Runner() as runner:
+        clients = [Client(Host.Uranus), Client(Host.Neptune)]
+        while True:
+            matrix, auxiliary = channel.get()
+            topology = scheduler(matrix, auxiliary)
+            schedule = translate_matrix(topology)
+
+            # with common.timing("schedule_daemon_dispatch"):
+            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
 
 
 def translate_matrix(matrix: np.ndarray) -> np.ndarray:
@@ -167,19 +177,11 @@ def translate_matrix(matrix: np.ndarray) -> np.ndarray:
     return schedule
 
 
-async def schedule_daemon_impl(
-    channel: Queue,
-    scheduler: Scheduler,
+async def schedule_daemon_dispatch_impl(
+    clients: List[Client],
+    schedule: np.ndarray,
 ):
-    clients = [Client(Host.Uranus), Client(Host.Neptune)]
-
-    while True:
-        matrix, auxiliary = channel.get()
-        topology = scheduler(matrix, auxiliary)
-        schedule = translate_matrix(topology)
-
-        # with common.timing("schedule_daemon_impl"):
-        await asyncio.gather(
-            *clients[0].pause_and_resume_flow_unchecked(schedule),
-            *clients[1].pause_and_resume_flow_unchecked(schedule),
-        )
+    await asyncio.gather(
+        *clients[0].pause_and_resume_flow_unchecked(schedule),
+        *clients[1].pause_and_resume_flow_unchecked(schedule),
+    )

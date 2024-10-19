@@ -10,5 +10,6 @@ pkgs.mkShell {
     pkgs.python312Packages.grpcio
     pkgs.python312Packages.grpcio-tools
     pkgs.python312Packages.scapy
+    pkgs.python312Packages.uvloop
   ];
 }

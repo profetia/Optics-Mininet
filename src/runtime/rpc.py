@@ -31,9 +31,9 @@ class Client:
             self.channels.append(channel)
             self.stubs.append(RpcStub(channel))
 
-    def __del__(self):
+    async def close(self):
         for channel in self.channels:
-            asyncio.create_task(channel.close())
+            await channel.close()
 
     async def __pause_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
         set_afc_entries = collect.pause_flow_impl(tor_id, schedule)
@@ -88,16 +88,21 @@ async def main():
         dtype=int,
     ).T
 
-    cli = Client(host=Host.Neptune)
+    neptune = Client(host=Host.Neptune)
     with common.timing("Neptune"):
-        await cli.pause_flow(schedule)
-        await cli.resume_flow(schedule)
+        await neptune.pause_flow(schedule)
+        await neptune.resume_flow(schedule)
+    await neptune.close()
 
-    cli = Client(host=Host.Uranus)
+    uranus = Client(host=Host.Uranus)
     with common.timing("Uranus"):
-        await cli.pause_flow(schedule)
-        await cli.resume_flow(schedule)
+        await uranus.pause_flow(schedule)
+        await uranus.resume_flow(schedule)
+    await uranus.close()
 
 
 if __name__ == "__main__":
+    import uvloop
+
+    uvloop.install()
     asyncio.run(main())
