@@ -13,7 +13,7 @@ class RoundRobinScheduler:
         self.schedules = []
 
         for shift in range(1, n_tors):
-            schedule = np.full((n_tors, n_tors), 0, dtype=int)
+            schedule = np.full((n_tors, n_tors), 0, dtype=np.int32)
             for i in range(n_tors):
                 schedule[i][(i + shift) % n_tors] = 1
             self.schedules.append(schedule)

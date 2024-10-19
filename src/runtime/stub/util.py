@@ -16,7 +16,7 @@ SLICE_PER_CONNECTION = PORT_NUM * 2
 
 default_schedule = np.loadtxt(
     "runtime/8tors_1ports_schedule.txt",
-    dtype=int,
+    dtype=np.int32,
 ).T
 
 electrical_port = 0xAA

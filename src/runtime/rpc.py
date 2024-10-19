@@ -9,7 +9,7 @@ import common
 import stub.collect as collect
 
 
-from proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest
+from proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest, ScheduleEntry
 from proto.rpc_pb2_grpc import RpcStub
 
 
@@ -47,13 +47,16 @@ class Client:
     async def pause_flow(self) -> None:
         await asyncio.gather(*self.pause_flow_unchecked())
 
-    async def __resume_flow_impl(self, tor_id: int, schedule: np.ndarray) -> None:
-        hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries = (
-            collect.resume_flow_impl(tor_id, schedule)
-        )
+    async def __resume_flow_impl(
+        self, tor_id: int, schedule: List[ScheduleEntry]
+    ) -> None:
+        # hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries = (
+        #     collect.resume_flow_impl(tor_id, schedule)
+        # )
         request = ResumeFlowRequest(
-            hoho_lookup_send_slice_table_entries=hoho_lookup_send_slice_entries,
-            slice_to_direct_tor_ip_table_entries=slice_to_direct_tor_ip_entries,
+            # hoho_lookup_send_slice_table_entries=hoho_lookup_send_slice_entries,
+            # slice_to_direct_tor_ip_table_entries=slice_to_direct_tor_ip_entries,
+            schedule_entries=schedule,
         )
 
         await self.stubs[tor_id % 4].ResumeFlow(request)
@@ -83,21 +86,27 @@ class Client:
 
 
 async def main():
-    schedule = np.loadtxt(
-        "runtime/8tors_1ports_test.txt",
-        dtype=int,
-    ).T
+    schedule = (
+        np.loadtxt(
+            "runtime/8tors_1ports_test.txt",
+            dtype=int,
+        )
+        .astype(np.int32)
+        .T
+    )
+
+    schedule_trimmed = collect.resume_flow_impl(0, schedule)
 
     neptune = Client(host=Host.Neptune)
     with common.timing("Neptune"):
         await neptune.pause_flow()
-        await neptune.resume_flow(schedule)
+        await neptune.resume_flow(schedule_trimmed)
     await neptune.close()
 
     uranus = Client(host=Host.Uranus)
     with common.timing("Uranus"):
         await uranus.pause_flow()
-        await uranus.resume_flow(schedule)
+        await uranus.resume_flow(schedule_trimmed)
     await uranus.close()
 
 

@@ -10,8 +10,9 @@ import common
 
 from runtime.proto.rpc_pb2 import (
     SetAfcTableEntry,
-    HohoLookupSendSliceTableEntry,
-    SliceToDirectTorIpTableEntry,
+    ScheduleEntry,
+    # HohoLookupSendSliceTableEntry,
+    # SliceToDirectTorIpTableEntry,
 )
 
 
@@ -65,35 +66,37 @@ for ip in consts.host_ip:
 
 
 def resume_flow_impl(tor_id: int, schedule: np.ndarray):
-    hoho_lookup_send_slice_entries = []
-    for dst in range(consts.TOR_NUM):
-        if dst == tor_id:
-            continue
+    return [ScheduleEntry(schedule_columns=row) for row in schedule]
 
-        port_slice_id = util.find_direct_port_slice_or_hardcoded_electrical(
-            tor_id, dst, schedule=schedule
-        )
-        for cur_slice, send_slice, port in port_slice_id:
-            hoho_lookup_send_slice_entries.append(
-                HohoLookupSendSliceTableEntry(
-                    cur_slice=cur_slice,
-                    dst_group=dst + 0x10,
-                    port=port,
-                    next_tor=dst + 0x10,
-                    slot=send_slice,
-                )
-            )
+    # hoho_lookup_send_slice_entries = []
+    # for dst in range(consts.TOR_NUM):
+    #     if dst == tor_id:
+    #         continue
 
-    slice_to_direct_tor_ip_entries = [
-        SliceToDirectTorIpTableEntry(
-            cur_slice=slice_id,
-            tor_ip=__host_ipv4_cache[
-                util.find_new_slice_ta(
-                    src=tor_id, port=0, time_slice=slice_id, schedule=schedule
-                )
-            ],
-        )
-        for slice_id in range(consts.SLICE_NUM)
-    ]
+    #     port_slice_id = util.find_direct_port_slice_or_hardcoded_electrical(
+    #         tor_id, dst, schedule=schedule
+    #     )
+    #     for cur_slice, send_slice, port in port_slice_id:
+    #         hoho_lookup_send_slice_entries.append(
+    #             HohoLookupSendSliceTableEntry(
+    #                 cur_slice=cur_slice,
+    #                 dst_group=dst + 0x10,
+    #                 port=port,
+    #                 next_tor=dst + 0x10,
+    #                 slot=send_slice,
+    #             )
+    #         )
 
-    return hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries
+    # slice_to_direct_tor_ip_entries = [
+    #     SliceToDirectTorIpTableEntry(
+    #         cur_slice=slice_id,
+    #         tor_ip=__host_ipv4_cache[
+    #             util.find_new_slice_ta(
+    #                 src=tor_id, port=0, time_slice=slice_id, schedule=schedule
+    #             )
+    #         ],
+    #     )
+    #     for slice_id in range(consts.SLICE_NUM)
+    # ]
+
+    # return hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries

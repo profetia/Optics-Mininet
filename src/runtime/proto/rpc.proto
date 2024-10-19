@@ -1,34 +1,24 @@
 syntax = "proto3";
 
-message HohoLookupSendSliceTableEntry {
-    uint64 cur_slice = 1;
-    uint64 dst_group = 2;
-    uint64 port = 3;
-    uint64 next_tor = 4;
-    uint64 slot = 5;
-}
-
 message SetAfcTableEntry {
-    uint64 app_id = 1;
-    uint64 slice_id = 2;
-    uint64 packet_id = 3;
-    uint64 afc_msg = 4;
+    uint32 app_id = 1;
+    uint32 slice_id = 2;
+    uint32 packet_id = 3;
+    uint32 afc_msg = 4;
 }
 
-message SliceToDirectTorIpTableEntry {
-    uint64 cur_slice = 1;
-    uint64 tor_ip = 2;
+message ScheduleEntry {
+    repeated int32 schedule_columns = 1;
 }
 
 message PauseFlowRequest {
-    repeated SetAfcTableEntry set_afc_table_entries = 2;
+    repeated SetAfcTableEntry set_afc_table_entries = 1;
 }
 
 message PauseFlowResponse {}
 
 message ResumeFlowRequest {
-    repeated HohoLookupSendSliceTableEntry hoho_lookup_send_slice_table_entries = 2;
-    repeated SliceToDirectTorIpTableEntry slice_to_direct_tor_ip_table_entries = 3;
+    repeated ScheduleEntry schedule_entries = 1;
 }
 
 message ResumeFlowResponse {}
