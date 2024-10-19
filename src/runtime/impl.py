@@ -13,7 +13,7 @@ import common
 
 from rpc import Client, Host
 from runtime.report import Report, ReportHeader, ReportEntry
-from stub import consts, collect
+from stub import consts
 
 EventHandler = Callable[[int, np.ndarray], Optional[Any]]
 """An event handler function takes the event counter and the
@@ -157,17 +157,15 @@ def schedule_daemon(
             topology = scheduler(matrix, auxiliary)
             schedule = translate_matrix(topology)
 
-            schedule_trimmed = collect.resume_flow_impl(0, schedule)
-
             # with common.timing("schedule_daemon_dispatch"):
-            runner.run(schedule_daemon_dispatch_impl(clients, schedule_trimmed))
+            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
 
 
 def translate_matrix(matrix: np.ndarray) -> np.ndarray:
     n_tors, n_ports = matrix.shape
 
     schedule = np.full(
-        (n_tors * consts.PORT_NUM, consts.SLICE_NUM),
+        n_tors * consts.PORT_NUM * consts.SLICE_NUM,
         -1,
         dtype=np.int32,
     )
@@ -178,7 +176,7 @@ def translate_matrix(matrix: np.ndarray) -> np.ndarray:
                 continue
 
             column = i * consts.PORT_NUM
-            schedule[column, :] = j
+            schedule[column * consts.SLICE_NUM : (column + 1) * consts.SLICE_NUM] = j
 
     return schedule
 

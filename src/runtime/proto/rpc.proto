@@ -7,10 +7,6 @@ message SetAfcTableEntry {
     uint32 afc_msg = 4;
 }
 
-message ScheduleEntry {
-    repeated int32 schedule_columns = 1;
-}
-
 message PauseFlowRequest {
     repeated SetAfcTableEntry set_afc_table_entries = 1;
 }
@@ -18,7 +14,7 @@ message PauseFlowRequest {
 message PauseFlowResponse {}
 
 message ResumeFlowRequest {
-    repeated ScheduleEntry schedule_entries = 1;
+    repeated int32 schedule_entries = 1;
 }
 
 message ResumeFlowResponse {}

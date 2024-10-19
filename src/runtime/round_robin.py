@@ -22,6 +22,15 @@ class RoundRobinScheduler:
         return self.schedules[auxiliary]
 
 
+class RoundRobinEventHandler:
+
+    def __init__(self):
+        pass
+
+    def __call__(self, counter: int, matrix: np.ndarray) -> None:
+        print(f"|------- Event {counter} -------|\n{matrix}\n")
+
+
 class RoundRobinTimingHandler:
     def __init__(self, n_tors: int, slice_duration_us: int):
         self.n_tors = n_tors
@@ -94,25 +103,25 @@ def main(args: argparse.Namespace) -> None:
         host_x17: tor_7,
     }
 
-    host_x10_mapped = "172.16.11.10"
-    host_x11_mapped = "172.16.11.11"
-    host_x12_mapped = "172.16.12.10"
-    host_x13_mapped = "172.16.12.11"
-    host_x14_mapped = "172.16.13.10"
-    host_x15_mapped = "172.16.13.11"
-    host_x16_mapped = "172.16.14.10"
-    host_x17_mapped = "172.16.14.11"
+    # host_x10_mapped = "172.16.11.10"
+    # host_x11_mapped = "172.16.11.11"
+    # host_x12_mapped = "172.16.12.10"
+    # host_x13_mapped = "172.16.12.11"
+    # host_x14_mapped = "172.16.13.10"
+    # host_x15_mapped = "172.16.13.11"
+    # host_x16_mapped = "172.16.14.10"
+    # host_x17_mapped = "172.16.14.11"
 
-    host_map = {
-        host_x10_mapped: host_x10,
-        host_x11_mapped: host_x11,
-        host_x12_mapped: host_x12,
-        host_x13_mapped: host_x13,
-        host_x14_mapped: host_x14,
-        host_x15_mapped: host_x15,
-        host_x16_mapped: host_x16,
-        host_x17_mapped: host_x17,
-    }
+    # host_map = {
+    #     host_x10_mapped: host_x10,
+    #     host_x11_mapped: host_x11,
+    #     host_x12_mapped: host_x12,
+    #     host_x13_mapped: host_x13,
+    #     host_x14_mapped: host_x14,
+    #     host_x15_mapped: host_x15,
+    #     host_x16_mapped: host_x16,
+    #     host_x17_mapped: host_x17,
+    # }
 
     time_slice_us = impl.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 25
 
@@ -124,7 +133,7 @@ def main(args: argparse.Namespace) -> None:
                 hosts=hosts,
                 tors=tors,
                 relations=relations,
-                host_map=host_map,
+                # host_map=host_map,
             ),
         ),
     )
@@ -133,6 +142,8 @@ def main(args: argparse.Namespace) -> None:
         dict(interval=time_slice_us / 1e6),
         RoundRobinTimingHandler(8, time_slice_us),
     )
+
+    # runtime.add_event_handler(RoundRobinEventHandler())
 
     runtime.run()
 

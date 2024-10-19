@@ -10,7 +10,6 @@ import common
 
 from runtime.proto.rpc_pb2 import (
     SetAfcTableEntry,
-    ScheduleEntry,
     # HohoLookupSendSliceTableEntry,
     # SliceToDirectTorIpTableEntry,
 )
