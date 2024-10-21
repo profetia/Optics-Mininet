@@ -5,12 +5,12 @@ import enum
 import numpy as np
 
 
-import common
-import stub.collect as collect
+from . import common
+from .stub import collect
 
 
-from proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest
-from proto.rpc_pb2_grpc import RpcStub
+from .proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest
+from .proto.rpc_pb2_grpc import RpcStub
 
 
 class Host(enum.Enum):

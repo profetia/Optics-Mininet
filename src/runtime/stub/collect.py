@@ -4,9 +4,7 @@ import struct
 
 from . import afc
 from . import consts
-from . import util
 
-import common
 
 from runtime.proto.rpc_pb2 import (
     SetAfcTableEntry,

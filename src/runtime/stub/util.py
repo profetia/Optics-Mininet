@@ -2,7 +2,6 @@ import numpy as np
 import numpy.typing as npt
 import numba
 
-import common
 
 PORT_NUM = 4
 TOR_NUM = 8

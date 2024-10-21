@@ -9,11 +9,11 @@ import uvloop
 from multiprocessing import Process, Queue
 from typing import Any, Callable, List, Optional, Tuple
 
-import common
+from . import common
 
-from rpc import Client, Host
-from runtime.report import Report, ReportHeader, ReportEntry
-from stub import consts
+from .rpc import Client, Host
+from .report import Report, ReportHeader, ReportEntry
+from .stub import consts
 
 EventHandler = Callable[[int, np.ndarray], Optional[Any]]
 """An event handler function takes the event counter and the
@@ -157,8 +157,8 @@ def schedule_daemon(
             topology = scheduler(matrix, auxiliary)
             schedule = translate_matrix(topology)
 
-            # with common.timing("schedule_daemon_dispatch"):
-            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
+            with common.timing("schedule_daemon_dispatch"):
+                runner.run(schedule_daemon_dispatch_impl(clients, schedule))
 
 
 def translate_matrix(matrix: np.ndarray) -> np.ndarray:
