@@ -1,6 +1,7 @@
 import asyncio
 import dataclasses
 import numpy as np
+import numpy.typing as npt
 import socket
 import struct
 import time
@@ -14,24 +15,29 @@ from . import common
 from .rpc import Client, Host
 from .report import Report, ReportHeader, ReportEntry
 from .stub import consts
+from .statistics import RunningStatistics
 
-EventHandler = Callable[[int, np.ndarray], Optional[Any]]
-"""An event handler function takes the event counter and the
-traffic matrix as input and returns an optional auxiliary data
-structure. If the event handler returns None, a workload will not
-be scheduled. Otherwise, the traffic matrix and the auxiliary data
-structure will be passed to the schedule function.
+EventHandler = Callable[
+    [int, npt.NDArray[np.int32], npt.NDArray[np.int32]], Optional[Any]
+]
+"""An event handler function takes the event counter, the traffic matrix,
+and the delta matrix as input and returns an optional auxiliary data
+structure. If the event handler returns None, a workload will not be
+scheduled. Otherwise, the traffic matrix and the auxiliary data structure
+will be passed to the schedule function.
 """
 
-TimingHandler = Callable[[float, np.ndarray], Optional[Any]]
-"""A timing handler function takes the invocation time and the
-traffic matrix as input and returns an optional auxiliary data
-structure. If the timing handler returns None, a workload will not
-be scheduled. Otherwise, the traffic matrix and the auxiliary data
-structure will be passed to the schedule function.
+TimingHandler = Callable[
+    [float, npt.NDArray[np.int32], npt.NDArray[np.float32]], Optional[Any]
+]
+"""A timing handler function takes the invocation time, the traffic matrix,
+and the variation matrix as input and returns an optional auxiliary data
+structure. If the timing handler returns None, a workload will not be
+scheduled. Otherwise, the traffic matrix and the auxiliary data structure
+will be passed to the schedule function.
 """
 
-Scheduler = Callable[[np.ndarray, Any], np.ndarray]
+Scheduler = Callable[[npt.NDArray[np.int32], Any], npt.NDArray[np.int32]]
 """A scheduler function takes the traffic matrix and the auxiliary
 data structure as input and returns a new schedule matrix.
 """
@@ -67,16 +73,11 @@ class Runtime:
     def run(self) -> None:
         channel = Queue()
 
-        collect = Process(
-            target=collect_daemon,
-            args=(channel, self.config, self.event_handlers, self.timing_handlers),
-        )
-        collect.start()
-
         schedule = Process(target=schedule_daemon, args=(channel, self.scheduler))
         schedule.start()
 
-        collect.join()
+        collect_daemon(channel, self.config, self.event_handlers, self.timing_handlers)
+
         schedule.join()
 
 
@@ -86,11 +87,15 @@ ENTRY_SIZE = struct.calcsize("QII")
 def collect_daemon_timing_impl(
     channel: Queue,
     report: Report,
+    stat: RunningStatistics,
     timing_handler: TimingHandler,
 ) -> None:
     now = time.time()
 
-    auxiliary = timing_handler(now, report.matrix())
+    variance = stat.variance()
+    stat.reset()
+
+    auxiliary = timing_handler(now, report.matrix(), variance)
     if auxiliary is None:
         return
 
@@ -109,12 +114,16 @@ def collect_daemon(
     udp.bind(config.address)
     udp.setblocking(False)
 
+    stats: List[RunningStatistics] = []
     for timing_kwargs, handler in timing_handlers:
+        stat = RunningStatistics(shape=report.matrix().shape)
         common.Repeat(
             **timing_kwargs,
             function=collect_daemon_timing_impl,
-            args=(channel, report, handler),
+            args=(channel, report, stat, handler),
         ).start()
+
+        stats.append(stat)
 
     while True:
         try:
@@ -132,13 +141,17 @@ def collect_daemon(
             ReportEntry(payload, i * ENTRY_SIZE) for i in range(report_entries_len)
         ]
 
-        updated = report.update(source, report_entries)
-        if not updated:
-            continue
+        delta = report.update(source, report_entries)
 
         matrix = report.matrix()
+        for stat in stats:
+            stat.update(matrix)
+
+        if np.sum(np.abs(delta)) == 0:
+            continue
+
         for handler in event_handlers:
-            auxiliary = handler(report.counter(), matrix)
+            auxiliary = handler(report.counter(), matrix, delta)
             if auxiliary is None:
                 continue
 
@@ -157,11 +170,11 @@ def schedule_daemon(
             topology = scheduler(matrix, auxiliary)
             schedule = translate_matrix(topology)
 
-            with common.timing("schedule_daemon_dispatch"):
-                runner.run(schedule_daemon_dispatch_impl(clients, schedule))
+            # with common.Timer("schedule_daemon_dispatch_impl"):
+            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
 
 
-def translate_matrix(matrix: np.ndarray) -> np.ndarray:
+def translate_matrix(matrix: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
     n_tors, n_ports = matrix.shape
 
     schedule = np.full(
@@ -183,7 +196,7 @@ def translate_matrix(matrix: np.ndarray) -> np.ndarray:
 
 async def schedule_daemon_dispatch_impl(
     clients: List[Client],
-    schedule: np.ndarray,
+    schedule: npt.NDArray[np.int32],
 ):
     await asyncio.gather(
         *clients[0].pause_and_resume_flow_unchecked(schedule),

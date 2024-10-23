@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import socket
 import struct
 
@@ -62,7 +63,7 @@ for ip in consts.host_ip:
     __host_ipv4_cache.append(host_ipv4)
 
 
-def resume_flow_impl(tor_id: int, schedule: np.ndarray):
+def resume_flow_impl(tor_id: int, schedule: npt.NDArray[np.int32]):
     return [ScheduleEntry(schedule_columns=row) for row in schedule]
 
     # hoho_lookup_send_slice_entries = []

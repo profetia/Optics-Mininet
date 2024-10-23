@@ -1,11 +1,10 @@
 import contextlib
+import threading
 import time
-
-from threading import Timer
 
 
 @contextlib.contextmanager
-def timing(name: str):
+def Timer(name: str):
     start = time.perf_counter_ns()
     try:
         yield
@@ -15,7 +14,7 @@ def timing(name: str):
     print(f"{name} took {(end - start) / 1_000_000} ms")
 
 
-class Repeat(Timer):
+class Repeat(threading.Timer):
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)

@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+import numpy.typing as npt
 
 from typing import Any
 
@@ -14,11 +15,23 @@ def NoopScheduler():
     return schedule
 
 
-def PrintEventHandler():
-    def handle_event(counter: int, matrix: np.ndarray):
-        print(f"|------- Event {counter} -------|\n{matrix}\n")
+class SnoopScheduler:
+    def __init__(self):
+        pass
 
-    return handle_event
+    def __call__(self, matrix: np.array, auxiliary: Any) -> np.array:
+        pass
+
+
+class SnoopEventHandler:
+
+    def __init__(self):
+        pass
+
+    def __call__(
+        self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
+    ) -> None:
+        print(f"|------- Event {counter} -------|\n{matrix}\n")
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,7 +58,7 @@ def main(args: argparse.Namespace) -> None:
         ),
     )
 
-    runtime.add_event_handler(PrintEventHandler())
+    runtime.add_event_handler(SnoopEventHandler())
 
     runtime.run()
 

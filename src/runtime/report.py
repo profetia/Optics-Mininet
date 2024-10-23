@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import socket
 import struct
 
@@ -49,30 +50,35 @@ class Report:
         self.__tors = tors
         self.__relations = relations
 
-        self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=int)
+        self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
         self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
         self.__counter = 0
 
-    def update(self, source: str, report_entries: Sequence[ReportEntry]) -> int:
+    def update(
+        self, source: str, report_entries: Sequence[ReportEntry]
+    ) -> npt.NDArray[np.int32]:
         source_tor = self.__relations[source]
+        source_tor_index = self.__tors.index(source_tor)
 
-        modified: int = 0
+        delta = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
+
         for entry in report_entries:
             target_tor = self.__relations[entry.target]
-            delta = entry.count - self.__traffic[source][entry.target]
-            self.__matrix[self.__tors.index(source_tor)][
-                self.__tors.index(target_tor)
-            ] += delta
-            modified += abs(delta)
+            target_tor_index = self.__tors.index(target_tor)
+
+            delta_local = entry.count - self.__traffic[source][entry.target]
+
+            delta[source_tor_index][target_tor_index] = delta_local
+            self.__matrix[source_tor_index][target_tor_index] += delta_local
+
             self.__traffic[source][entry.target] = entry.count
 
-        if modified:
-            self.__counter += 1
+        self.__counter += 1
 
-        return modified
+        return delta
 
-    def matrix(self) -> np.ndarray:
+    def matrix(self) -> npt.NDArray[np.int32]:
         return self.__matrix
 
     def counter(self) -> int:

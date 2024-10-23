@@ -1,6 +1,7 @@
 import argparse
 import time
 import numpy as np
+import numpy.typing as npt
 
 from typing import Any, Optional
 
@@ -27,7 +28,9 @@ class RoundRobinEventHandler:
     def __init__(self):
         pass
 
-    def __call__(self, counter: int, matrix: np.ndarray) -> None:
+    def __call__(
+        self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
+    ) -> None:
         print(f"|------- Event {counter} -------|\n{matrix}\n")
 
 
@@ -39,7 +42,12 @@ class RoundRobinTimingHandler:
         self.start = time.time()
         self.last_index = None
 
-    def __call__(self, now: float, matrix: np.array) -> Optional[int]:
+    def __call__(
+        self,
+        now: float,
+        matrix: npt.NDArray[np.int32],
+        variation: npt.NDArray[np.float32],
+    ) -> Optional[int]:
         elapsed = (now - self.start) * 1000_000 / self.slice_duration_us
         new_index = int(elapsed) % (self.n_tors - 1)
         if self.last_index is not None and new_index == self.last_index:
