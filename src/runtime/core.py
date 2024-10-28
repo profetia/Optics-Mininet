@@ -166,14 +166,24 @@ def schedule_daemon(
 ) -> None:
     uvloop.install()
     with asyncio.Runner() as runner:
+
+        last_schedule = None
         clients = [Client(Host.Uranus), Client(Host.Neptune)]
+
         while True:
             matrix, auxiliary = channel.get()
             topology = scheduler(matrix, auxiliary)
-            schedule = translate_matrix(matrix.shape[0], topology)
+            new_schedule = translate_matrix(matrix.shape[0], topology)
+
+            if last_schedule is not None and np.array_equal(
+                last_schedule, new_schedule
+            ):
+                continue
 
             # with common.Timer("schedule_daemon_dispatch_impl"):
-            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
+            runner.run(schedule_daemon_dispatch_impl(clients, new_schedule))
+
+            last_schedule = new_schedule
 
 
 def translate_matrix(

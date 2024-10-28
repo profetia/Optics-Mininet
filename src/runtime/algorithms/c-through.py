@@ -18,7 +18,7 @@ class CThroughScheduler:
 
         edges = []
         for (i, j), value in np.ndenumerate(matrix):
-            if i == j:
+            if i == j or value == 0:
                 continue
 
             edges.append((i, j + n_tors, value))
@@ -27,9 +27,16 @@ class CThroughScheduler:
         G.add_weighted_edges_from(edges)
 
         matching = nx.max_weight_matching(G, maxcardinality=True)
-        # print("Matching:\n", matching)
 
-        topology = map(lambda entry: (entry[0], entry[1] - n_tors), matching)
+        topology = []
+        for src, dst in matching:
+            if src >= n_tors:
+                src, dst = dst, src
+
+            topology.append((src, dst - n_tors))
+
+        # print("Topology:", topology)
+
         return topology
 
 
