@@ -3,7 +3,7 @@ import time
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Optional
+from typing import Any, Iterable, Optional, Tuple
 
 from runtime import core
 from runtime.stub import consts
@@ -14,12 +14,13 @@ class RoundRobinScheduler:
         self.schedules = []
 
         for shift in range(1, n_tors):
-            schedule = np.full((n_tors, n_tors), 0, dtype=np.int32)
+            schedule = []
             for i in range(n_tors):
-                schedule[i][(i + shift) % n_tors] = 1
+                schedule.append((i, (i + shift) % n_tors))
+
             self.schedules.append(schedule)
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> np.array:
+    def __call__(self, matrix: np.array, auxiliary: Any) -> Iterable[Tuple[int, int]]:
         return self.schedules[auxiliary]
 
 

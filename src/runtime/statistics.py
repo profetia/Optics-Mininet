@@ -30,7 +30,11 @@ class RunningStatistics:
     def count(self) -> int:
         return self.__count
 
-    def reset(self) -> None:
-        self.__mean.fill(0)
+    def reset(self, value: npt.NDArray[np.int32] = None) -> None:
+        if value is None:
+            self.__mean.fill(0)
+        else:
+            self.__mean = value.astype(np.float32)
+
         self.__variance.fill(0)
         self.__count = 0

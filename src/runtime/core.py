@@ -8,7 +8,7 @@ import time
 import uvloop
 
 from multiprocessing import Process, Queue
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Optional, Tuple
 
 from . import common
 
@@ -37,7 +37,7 @@ scheduled. Otherwise, the traffic matrix and the auxiliary data structure
 will be passed to the schedule function.
 """
 
-Scheduler = Callable[[npt.NDArray[np.int32], Any], npt.NDArray[np.int32]]
+Scheduler = Callable[[npt.NDArray[np.int32], Any], Iterable[Tuple[int, int]]]
 """A scheduler function takes the traffic matrix and the auxiliary
 data structure as input and returns a new schedule matrix.
 """
@@ -93,13 +93,15 @@ def collect_daemon_timing_impl(
     now = time.time()
 
     variance = stat.variance()
-    stat.reset()
 
-    auxiliary = timing_handler(now, report.matrix(), variance)
+    matrix = report.matrix()
+    stat.reset(value=matrix)
+
+    auxiliary = timing_handler(now, matrix, variance)
     if auxiliary is None:
         return
 
-    channel.put((report.matrix(), auxiliary))
+    channel.put((matrix, auxiliary))
 
 
 def collect_daemon(
@@ -147,8 +149,8 @@ def collect_daemon(
         for stat in stats:
             stat.update(matrix)
 
-        if np.sum(np.abs(delta)) == 0:
-            continue
+        # if np.sum(np.abs(delta)) == 0:
+        #     continue
 
         for handler in event_handlers:
             auxiliary = handler(report.counter(), matrix, delta)
@@ -168,14 +170,15 @@ def schedule_daemon(
         while True:
             matrix, auxiliary = channel.get()
             topology = scheduler(matrix, auxiliary)
-            schedule = translate_matrix(topology)
+            schedule = translate_matrix(matrix.shape[0], topology)
 
             # with common.Timer("schedule_daemon_dispatch_impl"):
             runner.run(schedule_daemon_dispatch_impl(clients, schedule))
 
 
-def translate_matrix(matrix: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
-    n_tors, n_ports = matrix.shape
+def translate_matrix(
+    n_tors: int, topology: Iterable[Tuple[int, int]]
+) -> npt.NDArray[np.int32]:
 
     schedule = np.full(
         n_tors * consts.PORT_NUM * consts.SLICE_NUM,
@@ -183,13 +186,9 @@ def translate_matrix(matrix: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
         dtype=np.int32,
     )
 
-    for i, row in enumerate(matrix):
-        for j, value in enumerate(row):
-            if not value:
-                continue
-
-            column = i * consts.PORT_NUM
-            schedule[column * consts.SLICE_NUM : (column + 1) * consts.SLICE_NUM] = j
+    for src, dst in topology:
+        column = src * consts.PORT_NUM
+        schedule[column * consts.SLICE_NUM : (column + 1) * consts.SLICE_NUM] = dst
 
     return schedule
 

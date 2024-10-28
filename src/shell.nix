@@ -6,11 +6,12 @@
 pkgs.mkShell {
   buildInputs = [
     pkgs.python312
+    pkgs.python312Packages.networkx
+    pkgs.python312Packages.numba
     pkgs.python312Packages.numpy
     pkgs.python312Packages.grpcio
     pkgs.python312Packages.grpcio-tools
     pkgs.python312Packages.scapy
     pkgs.python312Packages.uvloop
-    pkgs.python312Packages.numba
   ];
 }
