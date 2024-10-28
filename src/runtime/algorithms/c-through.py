@@ -3,17 +3,28 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Optional, Set, Tuple
 
 from runtime import core, statistics
 from runtime.stub import consts
+
+
+def trim_matching(n_tors: int, matching: Set[Tuple[int, int]]) -> Set[Tuple[int, int]]:
+    topology = set()
+    for src, dst in matching:
+        if src >= n_tors:
+            src, dst = dst, src
+
+        topology.add((src, dst - n_tors))
+
+    return topology
 
 
 class CThroughScheduler:
     def __init__(self) -> None:
         pass
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> Iterable[Tuple[int, int]]:
+    def __call__(self, matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
         n_tors = matrix.shape[0]
 
         edges = []
@@ -28,14 +39,10 @@ class CThroughScheduler:
 
         matching = nx.max_weight_matching(G, maxcardinality=True)
 
-        topology = []
-        for src, dst in matching:
-            if src >= n_tors:
-                src, dst = dst, src
+        topology = trim_matching(n_tors, matching)
 
-            topology.append((src, dst - n_tors))
-
-        # print("Topology:", topology)
+        # (counter,) = auxiliary
+        # print(f"========== Event {counter} dispatched ==========")
 
         return topology
 
@@ -50,18 +57,22 @@ class CThroughEventHandler:
 
     def __call__(
         self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
-    ) -> Optional[Tuple[()]]:
+    ) -> Optional[Tuple[int]]:
         self.stat.update(matrix)
+        # print("Matrix:", matrix.max())
+        # print("Variance:", self.stat.variance().max())
 
         if np.any(matrix > self.BUFFER_SIZE_THRESHOLD) and np.any(
             self.stat.variance() > self.BUFFER_VARIANCE_THRESHOLD
         ):
-            # print(f"Event {counter} triggered")
-            # print("========================================")
+            # print(f"========== Event {counter} triggered ==========")
             # print("Matrix:", matrix.max())
             # print("Variance:", self.stat.variance().max())
-            self.stat.reset(value=matrix)
-            return ()
+
+            self.stat.reset()
+            self.stat.update(matrix)
+
+            return (counter,)
 
         return None
 

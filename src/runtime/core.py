@@ -8,7 +8,7 @@ import time
 import uvloop
 
 from multiprocessing import Process, Queue
-from typing import Any, Callable, Iterable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple
 
 from . import common
 
@@ -37,7 +37,7 @@ scheduled. Otherwise, the traffic matrix and the auxiliary data structure
 will be passed to the schedule function.
 """
 
-Scheduler = Callable[[npt.NDArray[np.int32], Any], Iterable[Tuple[int, int]]]
+Scheduler = Callable[[npt.NDArray[np.int32], Any], Set[Tuple[int, int]]]
 """A scheduler function takes the traffic matrix and the auxiliary
 data structure as input and returns a new schedule matrix.
 """
@@ -95,7 +95,9 @@ def collect_daemon_timing_impl(
     variance = stat.variance()
 
     matrix = report.matrix()
-    stat.reset(value=matrix)
+
+    stat.reset()
+    stat.update(matrix)
 
     auxiliary = timing_handler(now, matrix, variance)
     if auxiliary is None:
@@ -167,27 +169,28 @@ def schedule_daemon(
     uvloop.install()
     with asyncio.Runner() as runner:
 
-        last_schedule = None
+        old_topology = set()
         clients = [Client(Host.Uranus), Client(Host.Neptune)]
 
         while True:
             matrix, auxiliary = channel.get()
-            topology = scheduler(matrix, auxiliary)
-            new_schedule = translate_matrix(matrix.shape[0], topology)
+            new_topology = scheduler(matrix, auxiliary)
 
-            if last_schedule is not None and np.array_equal(
-                last_schedule, new_schedule
-            ):
+            if new_topology.issubset(old_topology):
                 continue
 
-            # with common.Timer("schedule_daemon_dispatch_impl"):
-            runner.run(schedule_daemon_dispatch_impl(clients, new_schedule))
+            schedule = translate_matrix(matrix.shape[0], new_topology)
 
-            last_schedule = new_schedule
+            # with common.Timer("schedule_daemon_dispatch_impl"):
+            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
+
+            old_topology = new_topology
+            # print("Topology:", new_topology)
+            # print("Schedule:\n", schedule)
 
 
 def translate_matrix(
-    n_tors: int, topology: Iterable[Tuple[int, int]]
+    n_tors: int, topology: Set[Tuple[int, int]]
 ) -> npt.NDArray[np.int32]:
 
     schedule = np.full(

@@ -2,14 +2,14 @@ import argparse
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Iterable, Tuple
+from typing import Any, Set, Tuple
 
 from runtime import core
 from runtime.stub import consts
 
 
 def NoopScheduler():
-    def schedule(matrix: np.array, auxiliary: Any) -> Iterable[Tuple[int, int]]:
+    def schedule(matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
         pass
 
     return schedule

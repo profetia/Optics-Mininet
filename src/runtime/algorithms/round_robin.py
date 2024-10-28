@@ -3,7 +3,7 @@ import time
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Optional, Set, Tuple
 
 from runtime import core
 from runtime.stub import consts
@@ -20,7 +20,7 @@ class RoundRobinScheduler:
 
             self.schedules.append(schedule)
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> Iterable[Tuple[int, int]]:
+    def __call__(self, matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
         return self.schedules[auxiliary]
 
 
