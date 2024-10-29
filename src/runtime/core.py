@@ -9,11 +9,12 @@ import uvloop
 
 from multiprocessing import Process, Queue
 from typing import Any, Callable, List, Optional, Set, Tuple
+from uuid import UUID
 
 from . import common
 
 from .rpc import Client, Host
-from .report import Report, ReportHeader, ReportEntry
+from .report import Report, ReportHeader, ReportEntry, ReportFlags
 from .stub import consts
 from .statistics import RunningStatistics
 
@@ -131,14 +132,24 @@ def collect_daemon(
 
     while True:
         try:
-            data, (source, _) = udp.recvfrom(1024 + len(ReportHeader))
+            data, (source, _) = udp.recvfrom(16 * 3 + 1024 * 16)
         except BlockingIOError:
             continue
 
-        # the first 16 bytes are the header, extract as a 16 of bytes
-        header, payload = data[: len(ReportHeader)], data[len(ReportHeader) :]
+        header = data[:16]  # the first 16 bytes are the header
         if header != ReportHeader:
             continue
+
+        uuid = UUID(
+            version=4,
+            bytes_le=data[16 : 16 * 2],
+        )  # the second 16 bytes are the uuid
+
+        control_flags = ReportFlags(
+            buffer=data[16 * 2 : 16 * 3]
+        )  # the third 16 bytes are the control flags
+
+        payload = data[16 * 3 :]  # the rest of the data is the payload
 
         report_entries_len = len(payload) // ENTRY_SIZE
         report_entries = [

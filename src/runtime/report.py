@@ -30,12 +30,21 @@ ReportHeader = bytes(
 
 
 class ReportEntry:
-    def __init__(self, buffer: bytes, offset: int):
+    def __init__(self, buffer: bytes, offset: int = 0):
         self.count, tor, _ = struct.unpack_from("QII", buffer, offset)
         self.target: str = socket.inet_ntoa(struct.pack("I", socket.ntohl(tor)))
 
     def __str__(self) -> str:
         return f"target: {self.target}, count: {self.count}"
+
+
+class ReportFlags:
+
+    def __init__(self, buffer: bytes, offset: int = 0):
+        self.flags, *self.reserved = struct.unpack_from("B15x", buffer, offset)
+
+    def __str__(self) -> str:
+        return f"flags: {self.flags}"
 
 
 class Report:

@@ -1,5 +1,4 @@
 import argparse
-import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
@@ -7,17 +6,7 @@ from typing import Any, Optional, Set, Tuple
 
 from runtime import core, statistics
 from runtime.stub import consts
-
-
-def trim_matching(n_tors: int, matching: Set[Tuple[int, int]]) -> Set[Tuple[int, int]]:
-    topology = set()
-    for src, dst in matching:
-        if src >= n_tors:
-            src, dst = dst, src
-
-        topology.add((src, dst - n_tors))
-
-    return topology
+from runtime.algorithms import common
 
 
 class CThroughScheduler:
@@ -25,21 +14,7 @@ class CThroughScheduler:
         pass
 
     def __call__(self, matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
-        n_tors = matrix.shape[0]
-
-        edges = []
-        for (i, j), value in np.ndenumerate(matrix):
-            if i == j or value == 0:
-                continue
-
-            edges.append((i, j + n_tors, value))
-
-        G = nx.Graph()
-        G.add_weighted_edges_from(edges)
-
-        matching = nx.max_weight_matching(G, maxcardinality=True)
-
-        topology = trim_matching(n_tors, matching)
+        topology = common.bipartite_matching(matrix)
 
         # (counter,) = auxiliary
         # print(f"========== Event {counter} dispatched ==========")
