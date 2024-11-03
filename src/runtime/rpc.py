@@ -3,14 +3,13 @@ from typing import Awaitable, List
 import grpc
 import enum
 import numpy as np
-import numpy.typing as npt
 
 
 from . import common
-from .stub import collect
+from .stub import collect, consts
 
 
-from .proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest
+from .proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest, ScheduleEntry
 from .proto.rpc_pb2_grpc import RpcStub
 
 
@@ -49,7 +48,7 @@ class Client:
         await asyncio.gather(*self.pause_flow_unchecked())
 
     async def __resume_flow_impl(
-        self, tor_id: int, schedule: npt.NDArray[np.int32]
+        self, tor_id: int, schedule_entries: List[ScheduleEntry]
     ) -> None:
         # hoho_lookup_send_slice_entries, slice_to_direct_tor_ip_entries = (
         #     collect.resume_flow_impl(tor_id, schedule)
@@ -57,35 +56,44 @@ class Client:
         request = ResumeFlowRequest(
             # hoho_lookup_send_slice_table_entries=hoho_lookup_send_slice_entries,
             # slice_to_direct_tor_ip_table_entries=slice_to_direct_tor_ip_entries,
-            schedule_entries=schedule,
+            schedule_entries=schedule_entries,
         )
 
         await self.stubs[tor_id % 4].ResumeFlow(request)
 
     def resume_flow_unchecked(
-        self, schedule: npt.NDArray[np.int32]
-    ) -> List[Awaitable[None]]:
-        return [self.__resume_flow_impl(tor_id, schedule) for tor_id in self.tor_range]
-
-    async def resume_flow(self, schedule: npt.NDArray[np.int32]) -> None:
-        await asyncio.gather(*self.resume_flow_unchecked(schedule))
-
-    async def __pause_and_resume_flow_impl(
-        self, tor_id: int, schedule: npt.NDArray[np.int32]
-    ) -> None:
-        await self.__pause_flow_impl(tor_id)
-        await self.__resume_flow_impl(tor_id, schedule)
-
-    def pause_and_resume_flow_unchecked(
-        self, schedule: npt.NDArray[np.int32]
+        self, schedule_entries_all: List[List[ScheduleEntry]]
     ) -> List[Awaitable[None]]:
         return [
-            self.__pause_and_resume_flow_impl(tor_id, schedule)
-            for tor_id in self.tor_range
+            self.__resume_flow_impl(tor_id, schedule_entries)
+            for tor_id, schedule_entries in zip(self.tor_range, schedule_entries_all)
         ]
 
-    async def pause_and_resume_flow(self, schedule: npt.NDArray[np.int32]) -> None:
-        await asyncio.gather(*self.pause_and_resume_flow_unchecked(schedule))
+    async def resume_flow(
+        self, schedule_entries_all: List[List[ScheduleEntry]]
+    ) -> None:
+        await asyncio.gather(*self.resume_flow_unchecked(schedule_entries_all))
+
+    async def __pause_and_resume_flow_impl(
+        self, tor_id: int, schedule_entries: List[ScheduleEntry]
+    ) -> None:
+        await self.__pause_flow_impl(tor_id)
+        await self.__resume_flow_impl(tor_id, schedule_entries)
+
+    def pause_and_resume_flow_unchecked(
+        self, schedule_entries_all: List[List[ScheduleEntry]]
+    ) -> List[Awaitable[None]]:
+        return [
+            self.__pause_and_resume_flow_impl(tor_id, schedule_entries)
+            for tor_id, schedule_entries in zip(self.tor_range, schedule_entries_all)
+        ]
+
+    async def pause_and_resume_flow(
+        self, schedule_entries_all: List[List[ScheduleEntry]]
+    ) -> None:
+        await asyncio.gather(
+            *self.pause_and_resume_flow_unchecked(schedule_entries_all)
+        )
 
 
 async def main():
@@ -98,16 +106,27 @@ async def main():
         .T.flatten()
     )
 
+    schedule_entries_all = [
+        [
+            ScheduleEntry(
+                start=0,
+                end=consts.SLICE_NUM - 1,
+                target_tor=schedule[src * consts.PORT_NUM * consts.SLICE_NUM],
+            )
+        ]
+        for src in range(8)
+    ]
+
     neptune = Client(host=Host.Neptune)
     with common.Timer("Neptune"):
         await neptune.pause_flow()
-        await neptune.resume_flow(schedule)
+        await neptune.resume_flow(schedule_entries_all)
     await neptune.close()
 
     uranus = Client(host=Host.Uranus)
     with common.Timer("Uranus"):
         await uranus.pause_flow()
-        await uranus.resume_flow(schedule)
+        await uranus.resume_flow(schedule_entries_all)
     await uranus.close()
 
 

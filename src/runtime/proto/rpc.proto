@@ -13,8 +13,14 @@ message PauseFlowRequest {
 
 message PauseFlowResponse {}
 
+message ScheduleEntry {
+    uint32 start = 1;
+    uint32 end = 2;
+    uint32 target_tor = 3;
+}
+
 message ResumeFlowRequest {
-    repeated int32 schedule_entries = 1;
+    repeated ScheduleEntry schedule_entries = 1;
 }
 
 message ResumeFlowResponse {}

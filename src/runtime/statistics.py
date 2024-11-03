@@ -25,7 +25,7 @@ class RunningStatistics:
         return self.__mean
 
     def variance(self) -> npt.NDArray[np.float32]:
-        return self.__variance / self.__count
+        return self.__variance / self.__count if self.__count > 0 else self.__variance
 
     def count(self) -> int:
         return self.__count

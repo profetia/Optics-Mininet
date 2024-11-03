@@ -1,8 +1,16 @@
+import enum
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
 from typing import Optional, Set, Tuple
+
+
+class Bytes(enum.IntEnum):
+    KB = 1024
+    MB = 1024 * KB
+    GB = 1024 * MB
+    TB = 1024 * GB
 
 
 def bipartite_matching(

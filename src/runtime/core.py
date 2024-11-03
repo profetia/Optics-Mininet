@@ -18,6 +18,18 @@ from .report import Report, ReportHeader, ReportEntry, ReportFlags
 from .stub import consts
 from .statistics import RunningStatistics
 
+from .proto.rpc_pb2 import ScheduleEntry
+
+UnifiedTopology = Set[Tuple[int, int]]
+"""A unified schedule is a set of tuples, where each tuple contains the
+source and destination tor id. The range for this schedule will be set
+to 0..=consts.TOR_NUM.
+"""
+
+DiscreteTopology = List[Tuple[Tuple[int, int], Set[Tuple[int, int]]]]
+"""A discrete schedule is a list of tuples, where each tuple contains a
+range and a unified schedule for that range."""
+
 EventHandler = Callable[
     [int, npt.NDArray[np.int32], npt.NDArray[np.int32]], Optional[Any]
 ]
@@ -38,7 +50,10 @@ scheduled. Otherwise, the traffic matrix and the auxiliary data structure
 will be passed to the schedule function.
 """
 
-Scheduler = Callable[[npt.NDArray[np.int32], Any], Set[Tuple[int, int]]]
+Scheduler = Callable[
+    [npt.NDArray[np.int32], Any],
+    UnifiedTopology | DiscreteTopology,
+]
 """A scheduler function takes the traffic matrix and the auxiliary
 data structure as input and returns a new schedule matrix.
 """
@@ -140,16 +155,17 @@ def collect_daemon(
         if header != ReportHeader:
             continue
 
-        uuid = UUID(
+        uuid = UUID(  # noqa
             version=4,
-            bytes_le=data[16 : 16 * 2],
+            bytes_le=data[16 : 16 * 2],  # noqa: E203
         )  # the second 16 bytes are the uuid
 
-        control_flags = ReportFlags(
-            buffer=data[16 * 2 : 16 * 3]
+        control_flags = ReportFlags(  # noqa
+            buffer=data[16 * 2 : 16 * 3]  # noqa: E203
         )  # the third 16 bytes are the control flags
 
-        payload = data[16 * 3 :]  # the rest of the data is the payload
+        payload = data[16 * 3 :]  # noqa: E203
+        # the rest of the data is the payload
 
         report_entries_len = len(payload) // ENTRY_SIZE
         report_entries = [
@@ -187,41 +203,51 @@ def schedule_daemon(
             matrix, auxiliary = channel.get()
             new_topology = scheduler(matrix, auxiliary)
 
-            if new_topology.issubset(old_topology):
+            if isinstance(new_topology, set) and new_topology.issubset(old_topology):
+                # print("| %-50s |" % f"{old_topology} -> Skip")
+                # print("|" + "-" * 52 + "|\n")
                 continue
 
-            schedule = translate_matrix(matrix.shape[0], new_topology)
+            schedule_entries_all = translate_matrix(matrix.shape[0], new_topology)
 
             # with common.Timer("schedule_daemon_dispatch_impl"):
-            runner.run(schedule_daemon_dispatch_impl(clients, schedule))
+            runner.run(schedule_daemon_dispatch_impl(clients, schedule_entries_all))
 
+            # print("| %-50s |" % f"{old_topology} -> {new_topology}")
+            # print("|" + "-" * 52 + "|\n")
             old_topology = new_topology
-            # print("Topology:", new_topology)
-            # print("Schedule:\n", schedule)
 
 
 def translate_matrix(
-    n_tors: int, topology: Set[Tuple[int, int]]
-) -> npt.NDArray[np.int32]:
+    n_tors: int, new_topology: UnifiedTopology | DiscreteTopology
+) -> List[List[ScheduleEntry]]:
+    schedule_entries_all = [[] for _ in range(n_tors)]
 
-    schedule = np.full(
-        n_tors * consts.PORT_NUM * consts.SLICE_NUM,
-        -1,
-        dtype=np.int32,
-    )
+    if isinstance(new_topology, set):
+        new_topology = [((0, consts.SLICE_NUM - 1), new_topology)]
 
-    for src, dst in topology:
-        column = src * consts.PORT_NUM
-        schedule[column * consts.SLICE_NUM : (column + 1) * consts.SLICE_NUM] = dst
+    for (start, end), topology in new_topology:
+        for src, dst in topology:
+            schedule_entries_all[src].append(
+                ScheduleEntry(
+                    start=start,
+                    end=end,
+                    target_tor=dst,
+                )
+            )
 
-    return schedule
+    return schedule_entries_all
 
 
 async def schedule_daemon_dispatch_impl(
     clients: List[Client],
-    schedule: npt.NDArray[np.int32],
+    schedule_entries_all: List[List[ScheduleEntry]],
 ):
     await asyncio.gather(
-        *clients[0].pause_and_resume_flow_unchecked(schedule),
-        *clients[1].pause_and_resume_flow_unchecked(schedule),
+        *clients[0].pause_and_resume_flow_unchecked(
+            schedule_entries_all[: consts.TOR_NUM // 2]
+        ),
+        *clients[1].pause_and_resume_flow_unchecked(
+            schedule_entries_all[consts.TOR_NUM // 2 :]  # noqa: E203
+        ),
     )

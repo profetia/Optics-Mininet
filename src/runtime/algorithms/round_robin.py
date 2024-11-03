@@ -14,9 +14,9 @@ class RoundRobinScheduler:
         self.schedules = []
 
         for shift in range(1, n_tors):
-            schedule = []
+            schedule = set()
             for i in range(n_tors):
-                schedule.append((i, (i + shift) % n_tors))
+                schedule.add((i, (i + shift) % n_tors))
 
             self.schedules.append(schedule)
 
