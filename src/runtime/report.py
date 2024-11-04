@@ -3,7 +3,6 @@ import numpy.typing as npt
 import socket
 import struct
 
-from collections import defaultdict
 from typing import Sequence, Mapping
 
 
@@ -31,20 +30,11 @@ ReportHeader = bytes(
 
 class ReportEntry:
     def __init__(self, buffer: bytes, offset: int = 0):
-        self.count, tor, _ = struct.unpack_from("QII", buffer, offset)
-        self.target: str = socket.inet_ntoa(struct.pack("I", socket.ntohl(tor)))
+        self.value, dst_ip = struct.unpack_from("II", buffer, offset)
+        self.tor: str = socket.inet_ntoa(struct.pack("I", dst_ip))
 
     def __str__(self) -> str:
-        return f"target: {self.target}, count: {self.count}"
-
-
-class ReportFlags:
-
-    def __init__(self, buffer: bytes, offset: int = 0):
-        self.flags, *self.reserved = struct.unpack_from("B15x", buffer, offset)
-
-    def __str__(self) -> str:
-        return f"flags: {self.flags}"
+        return f"tor: {self.tor}, value: {self.value}"
 
 
 class Report:
@@ -60,7 +50,6 @@ class Report:
         self.__relations = relations
 
         self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
-        self.__traffic = {host: defaultdict(int) for host in self.__hosts}
 
         self.__counter = 0
 
@@ -70,21 +59,17 @@ class Report:
         source_tor = self.__relations[source]
         source_tor_index = self.__tors.index(source_tor)
 
-        delta = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
+        old_matrix = np.copy(self.__matrix)
 
         for entry in report_entries:
-            target_tor = self.__relations[entry.target]
+            target_tor = self.__relations[entry.tor]
             target_tor_index = self.__tors.index(target_tor)
 
-            delta_local = entry.count - self.__traffic[source][entry.target]
-
-            delta[source_tor_index][target_tor_index] = delta_local
-            self.__matrix[source_tor_index][target_tor_index] += delta_local
-
-            self.__traffic[source][entry.target] = entry.count
+            self.__matrix[source_tor_index][target_tor_index] = entry.value
 
         self.__counter += 1
 
+        delta = self.__matrix - old_matrix
         return delta
 
     def matrix(self) -> npt.NDArray[np.int32]:

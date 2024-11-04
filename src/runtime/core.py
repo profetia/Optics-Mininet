@@ -9,12 +9,11 @@ import uvloop
 
 from multiprocessing import Process, Queue
 from typing import Any, Callable, List, Optional, Set, Tuple
-from uuid import UUID
 
 from . import common
 
 from .rpc import Client, Host
-from .report import Report, ReportHeader, ReportEntry, ReportFlags
+from .report import Report, ReportHeader, ReportEntry
 from .stub import consts
 from .statistics import RunningStatistics
 
@@ -97,7 +96,8 @@ class Runtime:
         schedule.join()
 
 
-ENTRY_SIZE = struct.calcsize("QII")
+REPORT_HEADER_LEN = len(ReportHeader)
+REPORT_ENTRY_SIZE = struct.calcsize("II")
 
 
 def collect_daemon_timing_impl(
@@ -147,29 +147,23 @@ def collect_daemon(
 
     while True:
         try:
-            data, (source, _) = udp.recvfrom(16 * 3 + 1024 * 16)
+            data, (source, _) = udp.recvfrom(
+                REPORT_HEADER_LEN + 1024 * REPORT_ENTRY_SIZE
+            )
         except BlockingIOError:
             continue
 
-        header = data[:16]  # the first 16 bytes are the header
+        header = data[:REPORT_HEADER_LEN]  # the first 16 bytes are the header
         if header != ReportHeader:
             continue
 
-        uuid = UUID(  # noqa
-            version=4,
-            bytes_le=data[16 : 16 * 2],  # noqa: E203
-        )  # the second 16 bytes are the uuid
-
-        control_flags = ReportFlags(  # noqa
-            buffer=data[16 * 2 : 16 * 3]  # noqa: E203
-        )  # the third 16 bytes are the control flags
-
-        payload = data[16 * 3 :]  # noqa: E203
+        payload = data[REPORT_HEADER_LEN:]  # noqa: E203
         # the rest of the data is the payload
 
-        report_entries_len = len(payload) // ENTRY_SIZE
+        report_entries_len = len(payload) // REPORT_ENTRY_SIZE
         report_entries = [
-            ReportEntry(payload, i * ENTRY_SIZE) for i in range(report_entries_len)
+            ReportEntry(payload, i * REPORT_ENTRY_SIZE)
+            for i in range(report_entries_len)
         ]
 
         delta = report.update(source, report_entries)
