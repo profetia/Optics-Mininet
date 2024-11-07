@@ -1,4 +1,5 @@
 import argparse
+import logging
 import numpy as np
 import numpy.typing as npt
 
@@ -6,7 +7,10 @@ from typing import Any, Optional, Set, Tuple
 
 from runtime import core
 from runtime.stub import consts
-from runtime.algorithms import common
+from runtime.algorithms import common, snoop
+
+
+logger = logging.getLogger(__name__)
 
 
 class CThroughScheduler:
@@ -21,10 +25,12 @@ class CThroughScheduler:
 
 class CThroughTimingHandler:
 
-    BUFFER_SIZE_THRESHOLD = 200 * common.Bytes.KB
+    BUFFER_SIZE_THRESHOLD = 0
+    # BUFFER_SIZE_THRESHOLD = 200 * common.Bytes.KB
     # BUFFER_SIZE_THRESHOLD = 1 * common.Bytes.MB
 
-    BUFFER_VARIANCE_THRESHOLD = 200 * 100 * common.Bytes.KB
+    BUFFER_VARIANCE_THRESHOLD = 0
+    # BUFFER_VARIANCE_THRESHOLD = 200 * 100 * common.Bytes.KB
     # BUFFER_VARIANCE_THRESHOLD = 1 * common.Bytes.MB
 
     def __init__(self) -> None:
@@ -42,15 +48,19 @@ class CThroughTimingHandler:
         if np.any(matrix > self.BUFFER_SIZE_THRESHOLD) and np.any(
             variance > self.BUFFER_VARIANCE_THRESHOLD
         ):
-            # print("|" + "-" * 52 + "|")
-            # print("| %-50s |" % f"C-Through at {monment}")
-            # print("| %-50s |" % f"Buffer Size Threshold: {self.BUFFER_SIZE_THRESHOLD}")
-            # print(
-            #     "| %-50s |"
-            #     % f"Buffer Variance Threshold: {self.BUFFER_VARIANCE_THRESHOLD}"
-            # )
-            # print("| %-50s |" % f"Matrix Max: {matrix.max()}")
-            # print("| %-50s |" % f"Variance Max: {variance.max()}")
+            logger.info("\n")
+            logger.info("|" + "-" * 52 + "|")
+            logger.info("| %-50s |" % f"C-Through at {monment}")
+            logger.info(
+                "| %-50s |" % f"Buffer Size Threshold: {self.BUFFER_SIZE_THRESHOLD}"
+            )
+            logger.info(
+                "| %-50s |"
+                % f"Buffer Variance Threshold: {self.BUFFER_VARIANCE_THRESHOLD}"
+            )
+            logger.info("| %-50s |" % f"Matrix Max: {matrix.max()}")
+            logger.info("| %-50s |" % f"Variance Max: {variance.max()}")
+            logger.info("|" + "-" * 52 + "|")
 
             return ()
 
@@ -64,6 +74,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-p", "--port", type=int, help="Port number to bind to", default=1599
+    )
+    parser.add_argument(
+        "-s", "--snoop", action="store_true", help="Enable snoop event handler"
     )
     return parser.parse_args()
 
@@ -87,9 +100,14 @@ def main(args: argparse.Namespace) -> None:
 
     runtime.add_timing_handler(dict(interval=0.03), CThroughTimingHandler())
 
+    if args.snoop:
+        runtime.add_event_handler(snoop.SnoopEventHandler())
+
     runtime.run()
 
 
 if __name__ == "__main__":
+    common.logging_init()
+
     args = parse_args()
     main(args)

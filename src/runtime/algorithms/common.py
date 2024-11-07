@@ -1,7 +1,9 @@
 import enum
+import logging
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
+import os
 
 from typing import Optional, Set, Tuple
 
@@ -11,6 +13,11 @@ class Bytes(enum.IntEnum):
     MB = 1024 * KB
     GB = 1024 * MB
     TB = 1024 * GB
+
+
+def logging_init(default_level: int = logging.WARNING) -> None:
+    level = os.environ.get("LOG_LEVEL", default_level)
+    logging.basicConfig(level=getattr(logging, level, default_level))
 
 
 def bipartite_matching(

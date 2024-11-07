@@ -9,7 +9,12 @@ from . import common
 from .stub import collect, consts
 
 
-from .proto.rpc_pb2 import PauseFlowRequest, ResumeFlowRequest, ScheduleEntry
+from .proto.rpc_pb2 import (
+    PauseFlowRequest,
+    ResumeFlowRequest,
+    ResetRequest,
+    ScheduleEntry,
+)
 from .proto.rpc_pb2_grpc import RpcStub
 
 
@@ -68,6 +73,17 @@ class Client:
             self.__resume_flow_impl(tor_id, schedule_entries)
             for tor_id, schedule_entries in zip(self.tor_range, schedule_entries_all)
         ]
+
+    async def __reset_impl(self, tor_id: int) -> None:
+        request = ResetRequest()
+
+        await self.stubs[tor_id % 4].Reset(request)
+
+    def reset_unchecked(self) -> List[Awaitable[None]]:
+        return [self.__reset_impl(tor_id) for tor_id in self.tor_range]
+
+    async def reset(self) -> None:
+        await asyncio.gather(*self.reset_unchecked())
 
     async def resume_flow(
         self, schedule_entries_all: List[List[ScheduleEntry]]

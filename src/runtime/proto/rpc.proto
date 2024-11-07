@@ -25,10 +25,16 @@ message ResumeFlowRequest {
 
 message ResumeFlowResponse {}
 
+message ResetRequest {}
+
+message ResetResponse {}
+
 service Rpc {
 
 rpc PauseFlow(PauseFlowRequest) returns (PauseFlowResponse) {}
 
 rpc ResumeFlow(ResumeFlowRequest) returns (ResumeFlowResponse) {}
+
+rpc Reset(ResetRequest) returns (ResetResponse) {}
 
 }

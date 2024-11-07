@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import logging
 import numpy as np
 import numpy.typing as npt
 import socket
@@ -69,6 +70,9 @@ class Config:
 
     report_kwargs: dict
     """The keyword arguments for the report object."""
+
+
+logger = logging.getLogger(__name__)
 
 
 class Runtime:
@@ -198,8 +202,7 @@ def schedule_daemon(
             new_topology = scheduler(matrix, auxiliary)
 
             if isinstance(new_topology, set) and new_topology.issubset(old_topology):
-                # print("| %-50s |" % f"{old_topology} -> Skip")
-                # print("|" + "-" * 52 + "|\n")
+                logger.info(f"{old_topology} -> Skip")
                 continue
 
             schedule_entries_all = translate_matrix(matrix.shape[0], new_topology)
@@ -207,8 +210,7 @@ def schedule_daemon(
             # with common.Timer("schedule_daemon_dispatch_impl"):
             runner.run(schedule_daemon_dispatch_impl(clients, schedule_entries_all))
 
-            # print("| %-50s |" % f"{old_topology} -> {new_topology}")
-            # print("|" + "-" * 52 + "|\n")
+            logger.info(f"{old_topology} -> {new_topology}")
             old_topology = new_topology
 
 
