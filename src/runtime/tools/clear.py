@@ -17,8 +17,8 @@ async def main(args: argparse.Namespace) -> None:
     clients = [rpc.Client(rpc.Host.Neptune), rpc.Client(rpc.Host.Uranus)]
 
     await asyncio.gather(
-        *clients[0].reset_unchecked(),
-        *clients[1].reset_unchecked(),
+        *clients[0].clear_unchecked(),
+        *clients[1].clear_unchecked(),
     )
 
     await asyncio.gather(*[client.close() for client in clients])

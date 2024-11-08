@@ -89,8 +89,9 @@ def main(args: argparse.Namespace) -> None:
     runtime = core.Runtime(
         CThroughScheduler(),
         core.Config(
-            (args.address, args.port),
-            dict(
+            address=(args.address, args.port),
+            clear_default=True,
+            report_kwargs=dict(
                 hosts=hosts,
                 tors=tors,
                 relations=relations,

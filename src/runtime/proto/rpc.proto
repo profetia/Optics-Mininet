@@ -13,10 +13,17 @@ message PauseFlowRequest {
 
 message PauseFlowResponse {}
 
+enum ScheduleEntryType {
+    GeneralUnspecified = 0;
+    FixedRangeAdd = 1;
+    FixedRangeRemove = 2;
+}
+
 message ScheduleEntry {
-    uint32 start = 1;
-    uint32 end = 2;
-    uint32 target_tor = 3;
+    ScheduleEntryType type = 1;
+    uint32 start = 2;
+    uint32 end = 3;
+    uint32 target_tor = 4;
 }
 
 message ResumeFlowRequest {
@@ -25,9 +32,9 @@ message ResumeFlowRequest {
 
 message ResumeFlowResponse {}
 
-message ResetRequest {}
+message ClearRequest {}
 
-message ResetResponse {}
+message ClearResponse {}
 
 service Rpc {
 
@@ -35,6 +42,6 @@ rpc PauseFlow(PauseFlowRequest) returns (PauseFlowResponse) {}
 
 rpc ResumeFlow(ResumeFlowRequest) returns (ResumeFlowResponse) {}
 
-rpc Reset(ResetRequest) returns (ResetResponse) {}
+rpc Clear(ClearRequest) returns (ClearResponse) {}
 
 }

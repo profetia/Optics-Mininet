@@ -18,7 +18,7 @@ from .report import Report, ReportHeader, ReportEntry
 from .stub import consts
 from .statistics import RunningStatistics
 
-from .proto.rpc_pb2 import ScheduleEntry
+from .proto.rpc_pb2 import ScheduleEntry, ScheduleEntryType
 
 UnifiedTopology = Set[Tuple[int, int]]
 """A unified schedule is a set of tuples, where each tuple contains the
@@ -68,6 +68,9 @@ class Config:
     address: Tuple[str, int]
     """The address of the collector daemon."""
 
+    clear_default: bool
+    """Whether to clear the default flow tables on switches."""
+
     report_kwargs: dict
     """The keyword arguments for the report object."""
 
@@ -92,7 +95,9 @@ class Runtime:
     def run(self) -> None:
         channel = Queue()
 
-        schedule = Process(target=schedule_daemon, args=(channel, self.scheduler))
+        schedule = Process(
+            target=schedule_daemon, args=(channel, self.config, self.scheduler)
+        )
         schedule.start()
 
         collect_daemon(channel, self.config, self.event_handlers, self.timing_handlers)
@@ -189,6 +194,7 @@ def collect_daemon(
 
 def schedule_daemon(
     channel: Queue,
+    config: Config,
     scheduler: Scheduler,
 ) -> None:
     uvloop.install()
@@ -196,6 +202,9 @@ def schedule_daemon(
 
         old_topology = set()
         clients = [Client(Host.Uranus), Client(Host.Neptune)]
+
+        if config.clear_default:
+            runner.run(schedule_daemon_clear_default_impl(clients))
 
         while True:
             matrix, auxiliary = channel.get()
@@ -205,34 +214,101 @@ def schedule_daemon(
                 logger.info(f"{old_topology} -> Skip")
                 continue
 
-            schedule_entries_all = translate_matrix(matrix.shape[0], new_topology)
+            merged_topology, schedule_entries_all = translate_matrix(
+                matrix.shape[0], old_topology, new_topology
+            )
 
             # with common.Timer("schedule_daemon_dispatch_impl"):
             runner.run(schedule_daemon_dispatch_impl(clients, schedule_entries_all))
 
-            logger.info(f"{old_topology} -> {new_topology}")
-            old_topology = new_topology
+            logger.info(f"{old_topology} -> {merged_topology}")
+            old_topology = merged_topology
 
 
-def translate_matrix(
-    n_tors: int, new_topology: UnifiedTopology | DiscreteTopology
-) -> List[List[ScheduleEntry]]:
+def translate_matrix_unified(
+    n_tors: int, old_topology: UnifiedTopology, new_topology: UnifiedTopology
+) -> Tuple[UnifiedTopology, List[List[ScheduleEntry]]]:
     schedule_entries_all = [[] for _ in range(n_tors)]
+    schedule_map = [-1 for _ in range(n_tors)]
 
-    if isinstance(new_topology, set):
-        new_topology = [((0, consts.SLICE_NUM - 1), new_topology)]
+    for src, dst in old_topology:
+        schedule_map[src] = dst
+
+    for src, dst in new_topology:
+        old_dst = schedule_map[src]
+        if old_dst == dst:
+            continue
+
+        schedule_map[src] = dst
+
+        if old_dst != -1:
+            schedule_entries_all[src].append(
+                ScheduleEntry(
+                    type=ScheduleEntryType.FixedRangeRemove,
+                    start=0,
+                    end=consts.SLICE_NUM - 1,
+                    target_tor=old_dst,
+                )
+            )
+
+        schedule_entries_all[src].append(
+            ScheduleEntry(
+                type=ScheduleEntryType.FixedRangeAdd,
+                start=0,
+                end=consts.SLICE_NUM - 1,
+                target_tor=dst,
+            )
+        )
+
+    merged_topology = set()
+    for i in range(n_tors):
+        if schedule_map[i] == -1:
+            continue
+
+        merged_topology.add((i, schedule_map[i]))
+
+    return merged_topology, schedule_entries_all
+
+
+def translate_matrix_discrete(
+    n_tors: int, old_topology: DiscreteTopology, new_topology: DiscreteTopology
+) -> Tuple[DiscreteTopology, List[List[ScheduleEntry]]]:
+    schedule_entries_all = [[] for _ in range(n_tors)]
 
     for (start, end), topology in new_topology:
         for src, dst in topology:
             schedule_entries_all[src].append(
                 ScheduleEntry(
+                    type=ScheduleEntryType.GeneralUnspecified,
                     start=start,
                     end=end,
                     target_tor=dst,
                 )
             )
 
-    return schedule_entries_all
+    return new_topology, schedule_entries_all
+
+
+def translate_matrix(
+    n_tors: int,
+    old_topology: UnifiedTopology | DiscreteTopology,
+    new_topology: UnifiedTopology | DiscreteTopology,
+) -> Tuple[UnifiedTopology | DiscreteTopology, List[List[ScheduleEntry]]]:
+
+    if isinstance(new_topology, set):
+        # old_topology = [((0, consts.SLICE_NUM - 1), old_topology)]
+        # new_topology = [((0, consts.SLICE_NUM - 1), new_topology)]
+        # return translate_matrix_discrete(n_tors, old_topology, new_topology)
+        return translate_matrix_unified(n_tors, old_topology, new_topology)
+
+    return translate_matrix_discrete(n_tors, old_topology, new_topology)
+
+
+async def schedule_daemon_clear_default_impl(clients: List[Client]):
+    await asyncio.gather(
+        *clients[0].clear_unchecked(),
+        *clients[1].clear_unchecked(),
+    )
 
 
 async def schedule_daemon_dispatch_impl(
