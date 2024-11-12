@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Set, Tuple
+from typing import Any, Callable, Optional, Set, Tuple
 
 from runtime import core
 from runtime.stub import consts
@@ -25,12 +25,15 @@ class SnoopScheduler:
 
 class SnoopEventHandler:
 
-    def __init__(self):
-        pass
+    def __init__(self, condition: Optional[Callable] = None) -> None:
+        self.condition = condition
 
     def __call__(
         self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
     ) -> None:
+        if self.condition is not None and not self.condition(matrix, delta):
+            return
+
         print(f"|------- Event {counter} -------|\n{matrix}\n")
 
 

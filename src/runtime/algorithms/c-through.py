@@ -99,7 +99,7 @@ def main(args: argparse.Namespace) -> None:
         ),
     )
 
-    runtime.add_timing_handler(dict(interval=0.03), CThroughTimingHandler())
+    runtime.add_timing_handler(dict(interval=0.3), CThroughTimingHandler())
 
     if args.snoop:
         runtime.add_event_handler(snoop.SnoopEventHandler())
