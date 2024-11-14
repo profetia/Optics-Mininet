@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import numpy as np
 import numpy.typing as npt
 
@@ -40,7 +41,7 @@ class CThroughTimingHandler:
         self,
         monment: float,
         matrix: npt.NDArray[np.int32],
-        variance: npt.NDArray[np.float32],
+        variance: npt.NDArray[np.float64],
     ) -> Optional[Tuple[()]]:
         # print("Matrix:", matrix.max())
         # print("Variance:", variance.max())
@@ -108,7 +109,8 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    common.logging_init()
+    level = os.environ.get("LOG_LEVEL", logging.WARNING)
+    logging.basicConfig(level=getattr(logging, level, logging.WARNING))
 
     args = parse_args()
     main(args)

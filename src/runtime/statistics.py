@@ -8,8 +8,8 @@ from typing import Tuple
 class RunningStatistics:
 
     def __init__(self, shape: Tuple[int, int]) -> None:
-        self.__mean = np.zeros(shape, dtype=np.float32)
-        self.__variance = np.zeros(shape, dtype=np.float32)
+        self.__mean = np.zeros(shape, dtype=np.float64)
+        self.__variance = np.zeros(shape, dtype=np.float64)
         self.__count = 0
 
     def update(self, matrix: npt.NDArray[np.int32]) -> npt.NDArray[np.int32]:
@@ -21,10 +21,10 @@ class RunningStatistics:
 
         return delta
 
-    def mean(self) -> npt.NDArray[np.float32]:
+    def mean(self) -> npt.NDArray[np.float64]:
         return self.__mean
 
-    def variance(self) -> npt.NDArray[np.float32]:
+    def variance(self) -> npt.NDArray[np.float64]:
         return self.__variance / self.__count if self.__count > 0 else self.__variance
 
     def count(self) -> int:

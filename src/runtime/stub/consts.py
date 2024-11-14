@@ -116,10 +116,10 @@ bandwidth2 = 100
 bandwidth3 = 100
 
 
-bandwidth0 = 10
-bandwidth1 = 10
-bandwidth2 = 10
-bandwidth3 = 10
+# bandwidth0 = 10
+# bandwidth1 = 10
+# bandwidth2 = 10
+# bandwidth3 = 10
 
 
 fp_port_configs = [
@@ -157,3 +157,8 @@ fp_port_configs = [
     ("24/0", f"{bandwidth_elect}G", "NONE", 2),  # electrical
     # ('23/0', '100G', 'NONE', 2), #sw3-port59, rotation trigger port
 ]
+
+bandwidth_after_vma0 = 18
+bandwidth_after_vma1 = 18
+bandwidth_after_vma2 = 18
+bandwidth_after_vma3 = 18

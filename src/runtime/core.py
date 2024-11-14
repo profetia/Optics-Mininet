@@ -41,7 +41,7 @@ will be passed to the schedule function.
 """
 
 TimingHandler = Callable[
-    [float, npt.NDArray[np.int32], npt.NDArray[np.float32]], Optional[Any]
+    [float, npt.NDArray[np.int32], npt.NDArray[np.float64]], Optional[Any]
 ]
 """A timing handler function takes the invocation time, the traffic matrix,
 and the variation matrix as input and returns an optional auxiliary data

@@ -47,7 +47,7 @@ class RoundRobinTimingHandler:
         self,
         now: float,
         matrix: npt.NDArray[np.int32],
-        variation: npt.NDArray[np.float32],
+        variation: npt.NDArray[np.float64],
     ) -> Optional[int]:
         elapsed = (now - self.start) * 1000_000 / self.slice_duration_us
         new_index = int(elapsed) % (self.n_tors - 1)
