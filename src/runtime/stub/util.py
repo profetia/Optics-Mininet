@@ -2,12 +2,13 @@ import numpy as np
 import numpy.typing as npt
 import numba
 
+from runtime.stub import consts
+
 
 PORT_NUM = 4
 TOR_NUM = 8
 RANK_NUM = int(TOR_NUM / PORT_NUM)
 assert RANK_NUM * PORT_NUM == TOR_NUM
-SLICE_NUM = TOR_NUM * 2
 Q_NUM = RANK_NUM
 
 SLICE_PER_CONNECTION = PORT_NUM * 2
@@ -34,7 +35,7 @@ def find_direct_port_slice_or_hardcoded_electrical(
         if dst not in dst_list:
             continue
 
-        for slice_id in range(SLICE_NUM):
+        for slice_id in range(consts.SLICE_NUM):
             if dst_list[slice_id] != dst:  # there is direct link
                 continue
 
@@ -66,7 +67,7 @@ def find_direct_port_slice_or_electrical(
                 half_length = int(len(dst_list) / 2)
                 start = dst_list[half_length::].index(dst) + half_length
 
-            for slice_id in range(SLICE_NUM):
+            for slice_id in range(consts.SLICE_NUM):
                 if connection_for_port[port][slice_id] == dst:  # there is direct link
                     slice_port.append((slice_id, slice_id, port))
                 elif not is_hardcoded:
@@ -74,7 +75,7 @@ def find_direct_port_slice_or_electrical(
 
     if len(slice_port) == 0 and not is_hardcoded:
         # print(f"src {src} dst {dst} electrical")
-        for slice_id in range(SLICE_NUM):
+        for slice_id in range(consts.SLICE_NUM):
             slice_port.append((slice_id, slice_id, electrical_port))
 
     return slice_port

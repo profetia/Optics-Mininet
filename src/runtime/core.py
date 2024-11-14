@@ -11,14 +11,14 @@ import uvloop
 from multiprocessing import Process, Queue
 from typing import Any, Callable, List, Optional, Set, Tuple
 
-from . import common
+from runtime import common
 
-from .rpc import Client, Host
-from .report import Report, ReportHeader, ReportEntry
-from .stub import consts
-from .statistics import RunningStatistics
+from runtime.rpc import Client, Host
+from runtime.report import Report, ReportHeader, ReportEntry
+from runtime.stub import consts
+from runtime.statistics import RunningStatistics
 
-from .proto.rpc_pb2 import ScheduleEntry, ScheduleEntryType
+from runtime.proto.rpc_pb2 import ScheduleEntry, ScheduleEntryType
 
 UnifiedTopology = Set[Tuple[int, int]]
 """A unified schedule is a set of tuples, where each tuple contains the

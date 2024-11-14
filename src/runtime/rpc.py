@@ -5,17 +5,17 @@ import enum
 import numpy as np
 
 
-from . import common
-from .stub import collect, consts
+from runtime import common
+from runtime.stub import collect, consts
 
 
-from .proto.rpc_pb2 import (
+from runtime.proto.rpc_pb2 import (
     PauseFlowRequest,
     ResumeFlowRequest,
     ClearRequest,
     ScheduleEntry,
 )
-from .proto.rpc_pb2_grpc import RpcStub
+from runtime.proto.rpc_pb2_grpc import RpcStub
 
 
 class Host(enum.Enum):
