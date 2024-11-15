@@ -4,7 +4,7 @@ import os
 import numpy as np
 import numpy.typing as npt
 
-from typing import Any, Optional, Set, Tuple
+from typing import Any, Optional, Tuple
 
 from runtime import core
 from runtime.stub import consts
@@ -18,21 +18,18 @@ class CThroughScheduler:
     def __init__(self) -> None:
         pass
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
+    def __call__(
+        self,
+        matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
+        auxiliary: Any,
+    ) -> core.UnifiedTopology:
         topology = common.bipartite_matching(matrix)
 
         return topology
 
 
 class CThroughTimingHandler:
-
-    BUFFER_SIZE_THRESHOLD = 0
-    # BUFFER_SIZE_THRESHOLD = 200 * common.Bytes.KB
-    # BUFFER_SIZE_THRESHOLD = 1 * common.Bytes.MB
-
-    BUFFER_VARIANCE_THRESHOLD = 0
-    # BUFFER_VARIANCE_THRESHOLD = 200 * 100 * common.Bytes.KB
-    # BUFFER_VARIANCE_THRESHOLD = 1 * common.Bytes.MB
 
     def __init__(self) -> None:
         pass
@@ -41,24 +38,14 @@ class CThroughTimingHandler:
         self,
         monment: float,
         matrix: npt.NDArray[np.int32],
-        variance: npt.NDArray[np.float64],
+        n_flows: npt.NDArray[np.int32],
+        variance: Optional[npt.NDArray[np.float64]],
     ) -> Optional[Tuple[()]]:
-        # print("Matrix:", matrix.max())
-        # print("Variance:", variance.max())
 
-        if np.any(matrix > self.BUFFER_SIZE_THRESHOLD) and np.any(
-            variance > self.BUFFER_VARIANCE_THRESHOLD
-        ):
+        if np.any(matrix > 0) and np.any(variance > 0):
             logger.info("\n")
             logger.info("|" + "-" * 52 + "|")
             logger.info("| %-50s |" % f"C-Through at {monment}")
-            logger.info(
-                "| %-50s |" % f"Buffer Size Threshold: {self.BUFFER_SIZE_THRESHOLD}"
-            )
-            logger.info(
-                "| %-50s |"
-                % f"Buffer Variance Threshold: {self.BUFFER_VARIANCE_THRESHOLD}"
-            )
             logger.info("| %-50s |" % f"Matrix Max: {matrix.max()}")
             logger.info("| %-50s |" % f"Variance Max: {variance.max()}")
             logger.info("|" + "-" * 52 + "|")
@@ -91,12 +78,13 @@ def main(args: argparse.Namespace) -> None:
         CThroughScheduler(),
         core.Config(
             address=(args.address, args.port),
-            clear_default=True,
             report_kwargs=dict(
                 hosts=hosts,
                 tors=tors,
                 relations=relations,
             ),
+            clear_default=True,
+            include_statistics=True,
         ),
     )
 

@@ -20,7 +20,12 @@ class RoundRobinScheduler:
 
             self.schedules.append(schedule)
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> Set[Tuple[int, int]]:
+    def __call__(
+        self,
+        matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
+        auxiliary: Any,
+    ) -> core.UnifiedTopology:
         return self.schedules[auxiliary]
 
 
@@ -30,7 +35,11 @@ class RoundRobinEventHandler:
         pass
 
     def __call__(
-        self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
+        self,
+        counter: int,
+        matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
+        delta: npt.NDArray[np.int32],
     ) -> None:
         print(f"|------- Event {counter} -------|\n{matrix}\n")
 
@@ -47,6 +56,7 @@ class RoundRobinTimingHandler:
         self,
         now: float,
         matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
         variation: npt.NDArray[np.float64],
     ) -> Optional[int]:
         elapsed = (now - self.start) * 1000_000 / self.slice_duration_us

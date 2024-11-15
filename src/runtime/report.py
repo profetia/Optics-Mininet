@@ -30,11 +30,11 @@ ReportHeader = bytes(
 
 class ReportEntry:
     def __init__(self, buffer: bytes, offset: int = 0):
-        self.value, dst_ip = struct.unpack_from("II", buffer, offset)
+        self.value, dst_ip, self.count = struct.unpack_from("III", buffer, offset)
         self.tor: str = socket.inet_ntoa(struct.pack("I", dst_ip))
 
     def __str__(self) -> str:
-        return f"tor: {self.tor}, value: {self.value}"
+        return f"tor: {self.tor}, value: {self.value}, count: {self.count}"
 
 
 class Report:
@@ -50,6 +50,7 @@ class Report:
         self.__relations = relations
 
         self.__matrix = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
+        self.__n_flows = np.zeros((len(self.__tors), len(self.__tors)), dtype=np.int32)
 
         self.__counter = 0
 
@@ -66,6 +67,10 @@ class Report:
             target_tor_index = self.__tors.index(target_tor)
 
             self.__matrix[source_tor_index][target_tor_index] = entry.value
+            if entry.value > 0:
+                self.__n_flows[source_tor_index][target_tor_index] = entry.count
+            else:
+                self.__n_flows[source_tor_index][target_tor_index] = 0
 
         self.__counter += 1
 
@@ -74,6 +79,9 @@ class Report:
 
     def matrix(self) -> npt.NDArray[np.int32]:
         return self.__matrix
+
+    def n_flows(self) -> npt.NDArray[np.int32]:
+        return self.__n_flows
 
     def counter(self) -> int:
         return self.__counter

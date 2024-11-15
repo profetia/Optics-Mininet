@@ -19,7 +19,12 @@ class SnoopScheduler:
     def __init__(self):
         pass
 
-    def __call__(self, matrix: np.array, auxiliary: Any) -> np.array:
+    def __call__(
+        self,
+        matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
+        auxiliary: Any,
+    ) -> core.UnifiedTopology:
         pass
 
 
@@ -29,12 +34,21 @@ class SnoopEventHandler:
         self.condition = condition
 
     def __call__(
-        self, counter: int, matrix: npt.NDArray[np.int32], delta: npt.NDArray[np.int32]
+        self,
+        counter: int,
+        matrix: npt.NDArray[np.int32],
+        n_flows: npt.NDArray[np.int32],
+        delta: npt.NDArray[np.int32],
     ) -> None:
         if self.condition is not None and not self.condition(matrix, delta):
-            return
+            return None
+
+        # if np.any(matrix > 0) and np.any(delta > 0):
+        #     print(f"|------- Event {counter} -------|\n{matrix}\n{n_flows}\n")
 
         print(f"|------- Event {counter} -------|\n{matrix}\n")
+
+        return None
 
 
 def parse_args() -> argparse.Namespace:
