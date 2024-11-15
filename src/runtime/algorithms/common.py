@@ -42,6 +42,55 @@ def bipartite_matching(
     return topology
 
 
+def max_flow_matching(
+    matrix: npt.NDArray[np.int32 | np.float64],
+) -> Set[Tuple[int, int]]:
+    n_tors = matrix.shape[0]
+
+    G = nx.DiGraph()
+
+    source = n_tors * 2
+    for i in range(n_tors):
+        G.add_edge(
+            source,
+            i,
+            capacity=1,
+            weight=0,
+        )
+
+    sink = n_tors * 2 + 1
+    for j in range(n_tors):
+        G.add_edge(
+            j + n_tors,
+            sink,
+            capacity=n_tors,
+            weight=0,
+        )
+
+    for (i, j), value in np.ndenumerate(matrix):
+        if i == j or value == 0:
+            continue
+
+        G.add_edge(
+            i,
+            j + n_tors,
+            capacity=1,
+            weight=-value,
+        )
+
+    flow_dict = nx.max_flow_min_cost(G, source, sink)
+
+    result = set()
+    for src in range(n_tors):
+        for dst, value in flow_dict[src].items():
+            if dst == source or value == 0:
+                continue
+
+            result.add((src, dst - n_tors))
+
+    return result
+
+
 F64_EPSILON = np.finfo(np.float64).eps
 
 
@@ -226,6 +275,18 @@ if __name__ == "__main__":
     #     ]
     # )
 
+    # bdm = sinkhorn_transform(matrix)
+    # print(bdm.astype(np.float32))
+    # assert np.allclose(bdm.sum(axis=0), 1)
+    # assert np.allclose(bdm.sum(axis=1), 1)
+
+    # bvn = birkhoff_von_neumann_decomposition(bdm)
+    # for coeficient, permutation in bvn:
+    #     print(coeficient)
+    #     print(permutation)
+
+    # print(sum(perm for _, perm in bvn))
+
     matrix = np.array(
         [
             [0, 10306980, 0, 0],
@@ -260,16 +321,6 @@ if __name__ == "__main__":
     #     ]
     # )
 
-    print(hedera_transform(matrix, n_flows))
-
-    # bdm = sinkhorn_transform(matrix)
-    # print(bdm.astype(np.float32))
-    # assert np.allclose(bdm.sum(axis=0), 1)
-    # assert np.allclose(bdm.sum(axis=1), 1)
-
-    # bvn = birkhoff_von_neumann_decomposition(bdm)
-    # for coeficient, permutation in bvn:
-    #     print(coeficient)
-    #     print(permutation)
-
-    # print(sum(perm for _, perm in bvn))
+    bdm = hedera_transform(matrix, n_flows)
+    matches = max_flow_matching(bdm)
+    print(matches)
