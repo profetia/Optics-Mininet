@@ -24,7 +24,7 @@ class CThroughScheduler:
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
     ) -> core.UnifiedTopology:
-        topology = common.bipartite_matching(matrix)
+        topology = common.edmonds_karp_matching(matrix)
 
         return topology
 

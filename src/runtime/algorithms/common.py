@@ -3,7 +3,7 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
-from typing import Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 from runtime.stub import consts
 
@@ -42,7 +42,7 @@ def bipartite_matching(
     return topology
 
 
-def max_flow_matching(
+def edmonds_karp_matching(
     matrix: npt.NDArray[np.int32 | np.float64],
 ) -> Set[Tuple[int, int]]:
     n_tors = matrix.shape[0]
@@ -123,7 +123,7 @@ def sinkhorn_transform(
 def birkhoff_von_neumann_decomposition(
     matrix: npt.NDArray[np.float64],
     max_iter: Optional[int] = None,
-) -> npt.NDArray[np.float64]:
+) -> List[Tuple[float, npt.NDArray[np.int32]]]:
     n_tors = matrix.shape[0]
 
     if max_iter is None:
@@ -322,5 +322,5 @@ if __name__ == "__main__":
     # )
 
     bdm = hedera_transform(matrix, n_flows)
-    matches = max_flow_matching(bdm)
+    matches = edmonds_karp_matching(bdm)
     print(matches)

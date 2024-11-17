@@ -1,4 +1,4 @@
-SLICE_NUM = 16
+SLICE_NUM = 32
 Q_NUM = 2
 PORT_NUM = 4
 

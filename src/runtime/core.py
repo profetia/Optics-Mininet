@@ -127,13 +127,14 @@ def collect_daemon_timing_impl(
 ) -> None:
     now = time.time()
 
-    variance = stat.variance()
+    variance = stat.variance() if stat is not None else None
 
     matrix = report.matrix()
     n_flows = report.n_flows()
 
-    stat.reset()
-    stat.update(matrix)
+    if stat is not None:
+        stat.reset()
+        stat.update(matrix)
 
     auxiliary = timing_handler(now, matrix, n_flows, variance)
     if auxiliary is None:

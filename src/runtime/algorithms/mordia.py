@@ -3,9 +3,8 @@ import logging
 import os
 import numpy as np
 import numpy.typing as npt
+import math
 
-from multiprocessing import Value
-from multiprocessing.sharedctypes import Synchronized
 from typing import Any, Optional, Tuple
 
 from runtime import core
@@ -16,9 +15,9 @@ from runtime.algorithms import common, snoop
 logger = logging.getLogger(__name__)
 
 
-class HeliosScheduler:
-    def __init__(self, signal: Synchronized) -> None:
-        self.signal = signal
+class MordiaScheduler:
+    def __init__(self) -> None:
+        pass
 
     def __call__(
         self,
@@ -26,43 +25,61 @@ class HeliosScheduler:
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
     ) -> core.UnifiedTopology:
-        self.signal.value = 1
+        bdm = common.sinkhorn_transform(matrix)
+        composition = common.birkhoff_von_neumann_decomposition(bdm)
 
-        bdm = common.hedera_transform(matrix, n_flows)
-        topology = common.edmonds_karp_matching(bdm)
+        composition.sort(key=lambda x: x[0], reverse=True)
+        composition = composition[: consts.TOR_NUM]
+        print(composition)
 
-        self.signal.value = 0
+        topology, allocated_slices = [], 0
+        for coefficient, permutation in composition:
+            if allocated_slices >= consts.SLICE_NUM or coefficient < 0.01:
+                break
+
+            n_slices = math.ceil(coefficient * consts.SLICE_NUM)
+            if allocated_slices + n_slices > consts.SLICE_NUM:
+                n_slices = consts.SLICE_NUM - allocated_slices
+
+            links = set()
+            for (i, j), value in np.ndenumerate(permutation):
+                if value > 0:
+                    links.add((i, j))
+
+            topology.append(
+                (
+                    (allocated_slices, allocated_slices + n_slices),
+                    links,
+                )
+            )
+
+            print(
+                f"Alocating [{allocated_slices}, {allocated_slices + n_slices}]\n{links}"
+            )
+
+            allocated_slices += n_slices
+
         return topology
 
 
-class HeliosEventHandler:
+class MordiaTimingHandler:
 
-    def __init__(
-        self,
-        signal: Synchronized,
-        rate_limit_us: Optional[int] = None,
-    ) -> None:
-        self.signal = signal
-        self.rate_limit = rate_limit_us
-
-        self.last_event = None
+    def __init__(self) -> None:
+        pass
 
     def __call__(
         self,
-        event: int,
+        monment: float,
         matrix: npt.NDArray[np.int32],
         n_flows: npt.NDArray[np.int32],
-        delta: npt.NDArray[np.int32],
+        variance: Optional[npt.NDArray[np.float64]],
     ) -> Optional[Tuple[()]]:
-        if self.signal.value > 0:
-            return None
 
-        if np.any(matrix > 0) and np.any(delta > 0):
+        if np.any(matrix > 0):
             logger.info("\n")
             logger.info("|" + "-" * 52 + "|")
-            logger.info("| %-50s |" % f"Helios at {event}")
+            logger.info("| %-50s |" % f"Mordia at {monment}")
             logger.info("| %-50s |" % f"Matrix Max: {matrix.max()}")
-            logger.info("| %-50s |" % f"Delta Max: {delta.max()}")
             logger.info("|" + "-" * 52 + "|")
 
             return ()
@@ -89,22 +106,20 @@ def main(args: argparse.Namespace) -> None:
     tors = consts.host_ip
     relations = dict(zip(hosts, tors))
 
-    signal: Synchronized = Value("i", 0)
-
     runtime = core.Runtime(
-        HeliosScheduler(signal),
+        MordiaScheduler(),
         core.Config(
             address=(args.address, args.port),
-            clear_default=True,
             report_kwargs=dict(
                 hosts=hosts,
                 tors=tors,
                 relations=relations,
             ),
+            clear_default=True,
         ),
     )
 
-    runtime.add_event_handler(HeliosEventHandler(signal, rate_limit_us=10_000))
+    runtime.add_timing_handler(dict(interval=1.0), MordiaTimingHandler())
 
     if args.snoop:
         runtime.add_event_handler(snoop.SnoopEventHandler())
