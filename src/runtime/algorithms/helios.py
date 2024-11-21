@@ -1,12 +1,11 @@
 import argparse
 import logging
 import os
+import time
 import numpy as np
 import numpy.typing as npt
 
-from multiprocessing import Value
-from multiprocessing.sharedctypes import Synchronized
-from typing import Any, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from runtime import core
 from runtime.stub import consts
@@ -17,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class HeliosScheduler:
-    def __init__(self, signal: Synchronized) -> None:
-        self.signal = signal
+    def __init__(self) -> None:
+        pass
 
     def __call__(
         self,
@@ -26,26 +25,32 @@ class HeliosScheduler:
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
     ) -> core.UnifiedTopology:
-        self.signal.value = 1
 
         bdm = common.hedera_transform(matrix, n_flows)
         topology = common.edmonds_karp_matching(bdm)
 
-        self.signal.value = 0
         return topology
 
 
 class HeliosEventHandler:
 
-    def __init__(
-        self,
-        signal: Synchronized,
-        rate_limit_us: Optional[int] = None,
-    ) -> None:
-        self.signal = signal
-        self.rate_limit = rate_limit_us
+    AGING_SAMPLE_THRESHOLD = 8
 
-        self.last_event = None
+    ELEPHANT_FLOW_THRESHOLD = 500 * common.Bytes.KB
+
+    RATE_LIMIT_THRESHOLD = 40 * consts.SLICE_NUM * consts.SLICE_DURATION_US
+    # Since our while system works much faster than the original one in Helios,
+    # we need to adjust the rate limit threshold to avoid reconfiguring the
+    # OCS too frequently.
+
+    def __init__(self) -> None:
+        self.aging_samples: List[npt.NDArray[np.int32]] = []
+        self.rate_limit_time = time.time_ns()
+
+    def __is_elephant_flow(self) -> bool:
+        return np.any(
+            np.sum(np.array(self.aging_samples), axis=0) > self.ELEPHANT_FLOW_THRESHOLD
+        )
 
     def __call__(
         self,
@@ -54,10 +59,18 @@ class HeliosEventHandler:
         n_flows: npt.NDArray[np.int32],
         delta: npt.NDArray[np.int32],
     ) -> Optional[Tuple[()]]:
-        if self.signal.value > 0:
+        if len(self.aging_samples) >= self.AGING_SAMPLE_THRESHOLD:
+            self.aging_samples.pop(0)
+
+        self.aging_samples.append(np.copy(matrix))
+
+        now = time.time_ns()
+        if now - self.rate_limit_time < self.RATE_LIMIT_THRESHOLD * 1_000:
             return None
 
-        if np.any(matrix > 0) and np.any(delta > 0):
+        self.rate_limit_time = now
+
+        if self.__is_elephant_flow() and np.any(delta > 0):
             logger.info("\n")
             logger.info("|" + "-" * 52 + "|")
             logger.info("| %-50s |" % f"Helios at {event}")
@@ -89,10 +102,8 @@ def main(args: argparse.Namespace) -> None:
     tors = consts.host_ip
     relations = dict(zip(hosts, tors))
 
-    signal: Synchronized = Value("i", 0)
-
     runtime = core.Runtime(
-        HeliosScheduler(signal),
+        HeliosScheduler(),
         core.Config(
             address=(args.address, args.port),
             clear_default=True,
@@ -104,7 +115,7 @@ def main(args: argparse.Namespace) -> None:
         ),
     )
 
-    runtime.add_event_handler(HeliosEventHandler(signal, rate_limit_us=10_000))
+    runtime.add_event_handler(HeliosEventHandler())
 
     if args.snoop:
         runtime.add_event_handler(snoop.SnoopEventHandler())

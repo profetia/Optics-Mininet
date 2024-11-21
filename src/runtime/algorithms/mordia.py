@@ -25,12 +25,13 @@ class MordiaScheduler:
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
     ) -> core.UnifiedTopology:
+        # print(matrix)
         bdm = common.sinkhorn_transform(matrix)
         composition = common.birkhoff_von_neumann_decomposition(bdm)
 
         composition.sort(key=lambda x: x[0], reverse=True)
         composition = composition[: consts.TOR_NUM]
-        print(composition)
+        # print(composition)
 
         topology, allocated_slices = [], 0
         for coefficient, permutation in composition:
@@ -53,16 +54,17 @@ class MordiaScheduler:
                 )
             )
 
-            print(
-                f"Alocating [{allocated_slices}, {allocated_slices + n_slices}]\n{links}"
-            )
-
             allocated_slices += n_slices
 
         return topology
 
 
 class MordiaTimingHandler:
+
+    # If flow pausing is not enabled
+    MATRIX_MAX_THRESHOLD = 1 * common.Bytes.MB
+
+    # MATRIX_MAX_THRESHOLD = 0
 
     def __init__(self) -> None:
         pass
@@ -75,7 +77,7 @@ class MordiaTimingHandler:
         variance: Optional[npt.NDArray[np.float64]],
     ) -> Optional[Tuple[()]]:
 
-        if np.any(matrix > 0):
+        if np.any(matrix > self.MATRIX_MAX_THRESHOLD):
             logger.info("\n")
             logger.info("|" + "-" * 52 + "|")
             logger.info("| %-50s |" % f"Mordia at {monment}")

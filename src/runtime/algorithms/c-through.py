@@ -31,6 +31,11 @@ class CThroughScheduler:
 
 class CThroughTimingHandler:
 
+    # If flow pausing is not enabled
+    MATRIX_MAX_THRESHOLD = 1 * common.Bytes.MB
+
+    # MATRIX_MAX_THRESHOLD = 0
+
     def __init__(self) -> None:
         pass
 
@@ -42,7 +47,7 @@ class CThroughTimingHandler:
         variance: Optional[npt.NDArray[np.float64]],
     ) -> Optional[Tuple[()]]:
 
-        if np.any(matrix > 0) and np.any(variance > 0):
+        if np.any(matrix > self.MATRIX_MAX_THRESHOLD) and np.any(variance > 0):
             logger.info("\n")
             logger.info("|" + "-" * 52 + "|")
             logger.info("| %-50s |" % f"C-Through at {monment}")

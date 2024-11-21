@@ -42,6 +42,9 @@ def bipartite_matching(
     return topology
 
 
+EDMONDS_KARP_WEIGHT_MAX = 1000_000
+
+
 def edmonds_karp_matching(
     matrix: npt.NDArray[np.int32 | np.float64],
 ) -> Set[Tuple[int, int]]:
@@ -49,24 +52,7 @@ def edmonds_karp_matching(
 
     G = nx.DiGraph()
 
-    source = n_tors * 2
-    for i in range(n_tors):
-        G.add_edge(
-            source,
-            i,
-            capacity=1,
-            weight=0,
-        )
-
-    sink = n_tors * 2 + 1
-    for j in range(n_tors):
-        G.add_edge(
-            j + n_tors,
-            sink,
-            capacity=n_tors,
-            weight=0,
-        )
-
+    left_nodes, right_nodes = set(), set()
     for (i, j), value in np.ndenumerate(matrix):
         if i == j or value == 0:
             continue
@@ -75,13 +61,35 @@ def edmonds_karp_matching(
             i,
             j + n_tors,
             capacity=1,
-            weight=-value,
+            weight=EDMONDS_KARP_WEIGHT_MAX - int(value * EDMONDS_KARP_WEIGHT_MAX),
+            # networkx works poorly with float weights
+        )
+
+        left_nodes.add(i)
+        right_nodes.add(j + n_tors)
+
+    source = n_tors * 2
+    for i in left_nodes:
+        G.add_edge(
+            source,
+            i,
+            capacity=1,
+            weight=0,
+        )
+
+    sink = n_tors * 2 + 1
+    for j in right_nodes:
+        G.add_edge(
+            j,
+            sink,
+            capacity=n_tors,
+            weight=0,
         )
 
     flow_dict = nx.max_flow_min_cost(G, source, sink)
 
     result = set()
-    for src in range(n_tors):
+    for src in left_nodes:
         for dst, value in flow_dict[src].items():
             if dst == source or value == 0:
                 continue

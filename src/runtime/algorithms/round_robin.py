@@ -84,7 +84,7 @@ def main(args: argparse.Namespace) -> None:
     tors = consts.host_ip
     relations = dict(zip(hosts, tors))
 
-    TIME_SLICE_ROUND_ROBIN = core.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 25
+    TIME_SLICE_ROUND_ROBIN = consts.SLICE_DURATION_US * consts.SLICE_NUM * 10 * 25
 
     runtime = core.Runtime(
         RoundRobinScheduler(8),

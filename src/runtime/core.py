@@ -1,15 +1,17 @@
 import asyncio
 import dataclasses
 import logging
+import multiprocessing as mp
 import numpy as np
 import numpy.typing as npt
+import queue
 import socket
 import struct
+import threading as th
 import time
 import uvloop
 
-from multiprocessing import Process, Queue
-from typing import Any, Callable, List, Optional, Set, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple, Union
 
 from runtime import common
 
@@ -66,10 +68,6 @@ auxiliary data structure as input and returns a new schedule matrix.
 """
 
 
-SLICE_DURATION_US = 50
-"""The duration of a time slice in us."""
-
-
 @dataclasses.dataclass
 class Config:
     address: Tuple[str, int]
@@ -83,6 +81,9 @@ class Config:
 
     clear_default: bool = False
     """Whether to clear the default flow tables on switches."""
+
+    use_process: bool = True
+    """Whether to run the scheduler in a separate process."""
 
 
 logger = logging.getLogger(__name__)
@@ -103,11 +104,18 @@ class Runtime:
         self.timing_handlers.append((timing_kwargs, handler))
 
     def run(self) -> None:
-        channel = Queue()
+        channel = mp.Queue() if self.config.use_process else queue.Queue()
 
-        schedule = Process(
-            target=schedule_daemon, args=(channel, self.config, self.scheduler)
+        schedule = (
+            mp.Process(
+                target=schedule_daemon, args=(channel, self.config, self.scheduler)
+            )
+            if self.config.use_process
+            else th.Thread(
+                target=schedule_daemon, args=(channel, self.config, self.scheduler)
+            )
         )
+
         schedule.start()
 
         collect_daemon(channel, self.config, self.event_handlers, self.timing_handlers)
@@ -120,7 +128,7 @@ REPORT_ENTRY_SIZE = struct.calcsize("III")
 
 
 def collect_daemon_timing_impl(
-    channel: Queue,
+    channel: Union[mp.Queue, queue.Queue],
     report: Report,
     timing_handler: TimingHandler,
     stat: Optional[RunningStatistics] = None,
@@ -145,7 +153,7 @@ def collect_daemon_timing_impl(
 
 
 def collect_daemon(
-    channel: Queue,
+    channel: Union[mp.Queue, queue.Queue],
     config: Config,
     event_handlers: List[EventHandler],
     timing_handlers: List[Tuple[dict, TimingHandler]],
@@ -211,7 +219,7 @@ def collect_daemon(
 
 
 def schedule_daemon(
-    channel: Queue,
+    channel: Union[mp.Queue, queue.Queue],
     config: Config,
     scheduler: Scheduler,
 ) -> None:
