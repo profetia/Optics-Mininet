@@ -24,13 +24,16 @@ class MordiaScheduler:
         matrix: npt.NDArray[np.int32],
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
-    ) -> core.UnifiedTopology:
-        # print(matrix)
-        bdm = common.sinkhorn_transform(matrix)
+    ) -> core.Topology:
+        # Since we actually only have 4 ToRs, drop the unused ones
+        real_tor_map = [0, 2, 3, 5]
+        real_matrix = matrix[real_tor_map][:, real_tor_map]
+
+        bdm = common.sinkhorn_transform(real_matrix)
         composition = common.birkhoff_von_neumann_decomposition(bdm)
 
         composition.sort(key=lambda x: x[0], reverse=True)
-        composition = composition[: consts.TOR_NUM]
+        composition = composition[:4]
         # print(composition)
 
         topology, allocated_slices = [], 0
@@ -45,11 +48,11 @@ class MordiaScheduler:
             links = set()
             for (i, j), value in np.ndenumerate(permutation):
                 if value > 0:
-                    links.add((i, j))
+                    links.add((real_tor_map[i], real_tor_map[j]))
 
             topology.append(
                 (
-                    (allocated_slices, allocated_slices + n_slices),
+                    (allocated_slices, allocated_slices + n_slices - 1),
                     links,
                 )
             )
@@ -90,7 +93,7 @@ class MordiaTimingHandler:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="opsys_control")
+    parser = argparse.ArgumentParser(description="Mordia")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
     )
@@ -118,10 +121,11 @@ def main(args: argparse.Namespace) -> None:
                 relations=relations,
             ),
             clear_default=True,
+            topology_type=core.TopologyType.Discrete,
         ),
     )
 
-    runtime.add_timing_handler(dict(interval=1.0), MordiaTimingHandler())
+    runtime.add_timing_handler(dict(interval=0.3), MordiaTimingHandler())
 
     if args.snoop:
         runtime.add_event_handler(snoop.SnoopEventHandler())
@@ -130,7 +134,7 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    level = os.environ.get("LOG_LEVEL", logging.WARNING)
+    level = os.environ.get("LOG_LEVEL", "WARNING")
     logging.basicConfig(level=getattr(logging, level, logging.WARNING))
 
     args = parse_args()

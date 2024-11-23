@@ -25,7 +25,7 @@ class RoundRobinScheduler:
         matrix: npt.NDArray[np.int32],
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
-    ) -> core.UnifiedTopology:
+    ) -> core.Topology:
         return self.schedules[auxiliary]
 
 
@@ -69,7 +69,7 @@ class RoundRobinTimingHandler:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="opsys_control")
+    parser = argparse.ArgumentParser(description="Round Robin")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
     )

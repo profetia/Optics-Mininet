@@ -23,7 +23,7 @@ class CThroughScheduler:
         matrix: npt.NDArray[np.int32],
         n_flows: npt.NDArray[np.int32],
         auxiliary: Any,
-    ) -> core.UnifiedTopology:
+    ) -> core.Topology:
         topology = common.edmonds_karp_matching(matrix)
 
         return topology
@@ -61,7 +61,7 @@ class CThroughTimingHandler:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="opsys_control")
+    parser = argparse.ArgumentParser(description="C-Through")
     parser.add_argument(
         "-a", "--address", type=str, help="IPv4 address to bind to", default="0.0.0.0"
     )
@@ -102,7 +102,7 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    level = os.environ.get("LOG_LEVEL", logging.WARNING)
+    level = os.environ.get("LOG_LEVEL", "WARNING")
     logging.basicConfig(level=getattr(logging, level, logging.WARNING))
 
     args = parse_args()

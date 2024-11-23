@@ -42,11 +42,12 @@ def bipartite_matching(
     return topology
 
 
-EDMONDS_KARP_WEIGHT_MAX = 1000_000
+NETWORKX_WEIGHT_MAX = 1_000_000
 
 
 def edmonds_karp_matching(
     matrix: npt.NDArray[np.int32 | np.float64],
+    includes_weight: bool = False,
 ) -> Set[Tuple[int, int]]:
     n_tors = matrix.shape[0]
 
@@ -57,11 +58,16 @@ def edmonds_karp_matching(
         if i == j or value == 0:
             continue
 
+        if matrix.dtype == np.float64:
+            weight = NETWORKX_WEIGHT_MAX - int(value * NETWORKX_WEIGHT_MAX)
+        else:
+            weight = -value
+
         G.add_edge(
             i,
             j + n_tors,
             capacity=1,
-            weight=EDMONDS_KARP_WEIGHT_MAX - int(value * EDMONDS_KARP_WEIGHT_MAX),
+            weight=weight,
             # networkx works poorly with float weights
         )
 
@@ -94,9 +100,50 @@ def edmonds_karp_matching(
             if dst == source or value == 0:
                 continue
 
-            result.add((src, dst - n_tors))
+            if includes_weight:
+                result.add((src, dst - n_tors, matrix[src, dst - n_tors]))
+            else:
+                result.add((src, dst - n_tors))
 
     return result
+
+
+def weighted_b_matching(
+    matrix: npt.NDArray[np.float64],
+    b: int,
+    max_iter: int = 1000,
+    ignore_zero: bool = False,
+) -> Set[Tuple[int, int]]:
+    G = nx.Graph()
+    for (i, j), value in np.ndenumerate(matrix):
+        if i == j or (value == 0 and ignore_zero):
+            continue
+
+        G.add_edge(i, j, weight=int(value * NETWORKX_WEIGHT_MAX))
+
+    vertex_degree = {node: 0 for node in G.nodes}
+    matched_edges = set()
+    for _ in range(max_iter):
+        new_all_matched = nx.max_weight_matching(G, maxcardinality=True)
+        if not new_all_matched:
+            break
+
+        new_matched_edges = set()
+        for src, dst in new_all_matched:
+            if vertex_degree[src] < b and vertex_degree[dst] < b:
+                vertex_degree[src] += 1
+                vertex_degree[dst] += 1
+                new_matched_edges.add((src, dst))
+
+        matched_edges.update(new_matched_edges)
+
+        if all(degree >= b for degree in vertex_degree.values()):
+            break
+
+        for src, dst in new_matched_edges:
+            G.remove_edge(src, dst)
+
+    return matched_edges
 
 
 F64_EPSILON = np.finfo(np.float64).eps
@@ -295,22 +342,22 @@ if __name__ == "__main__":
 
     # print(sum(perm for _, perm in bvn))
 
-    matrix = np.array(
-        [
-            [0, 10306980, 0, 0],
-            [0, 0, 0, 0],
-            [0, 10485760, 0, 0],
-            [0, 10463860, 0, 0],
-        ]
-    )
-    n_flows = np.array(
-        [
-            [0, 1, 0, 0],
-            [0, 0, 0, 0],
-            [0, 1, 0, 0],
-            [0, 1, 0, 0],
-        ]
-    )
+    # matrix = np.array(
+    #     [
+    #         [0, 10306980, 0, 0],
+    #         [0, 0, 0, 0],
+    #         [0, 10485760, 0, 0],
+    #         [0, 10463860, 0, 0],
+    #     ]
+    # )
+    # n_flows = np.array(
+    #     [
+    #         [0, 1, 0, 0],
+    #         [0, 0, 0, 0],
+    #         [0, 1, 0, 0],
+    #         [0, 1, 0, 0],
+    #     ]
+    # )
 
     # matrix = np.array(
     #     [
@@ -329,6 +376,20 @@ if __name__ == "__main__":
     #     ]
     # )
 
-    bdm = hedera_transform(matrix, n_flows)
-    matches = edmonds_karp_matching(bdm)
-    print(matches)
+    # bdm = hedera_transform(matrix, n_flows)
+    # matches = edmonds_karp_matching(bdm)
+    # print(matches)
+
+    bdm = np.array(
+        [
+            [0, 0, 0.05, 0.075, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0.05, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+            [0.05263158, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    )
+    print(weighted_b_matching(bdm, 4))

@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import enum
 import logging
 import multiprocessing as mp
 import numpy as np
@@ -28,9 +29,17 @@ and destination tor id.
 The range for this schedule will be set to 0..=consts.TOR_NUM - 1.
 """
 
+MultiHopTopology = Set[Tuple[int, int, int]]
+"""A multi-hop schedule is a set of tuples, where each tuple contains the source,
+destination and intermediate tor id.
+The range for this schedule will be set to 0..=consts.TOR_NUM - 1.
+"""
+
 DiscreteTopology = List[Tuple[Tuple[int, int], Set[Tuple[int, int]]]]
 """A discrete schedule is a list of tuples, where each tuple contains a range
 and a unified schedule for that range."""
+
+Topology = Union[UnifiedTopology, DiscreteTopology, MultiHopTopology]
 
 EventHandler = Callable[
     [int, npt.NDArray[np.int32], npt.NDArray[np.int32], npt.NDArray[np.int32]],
@@ -61,11 +70,17 @@ structure will be passed to the schedule function.
 
 Scheduler = Callable[
     [npt.NDArray[np.int32], npt.NDArray[np.int32], Any],
-    UnifiedTopology | DiscreteTopology,
+    Topology,
 ]
 """A scheduler function takes the traffic matrix, the number of flows and the
 auxiliary data structure as input and returns a new schedule matrix.
 """
+
+
+class TopologyType(enum.Enum):
+    Unified = "Unified"
+    Discrete = "Discrete"
+    MultiHop = "MultiHop"
 
 
 @dataclasses.dataclass
@@ -84,6 +99,9 @@ class Config:
 
     use_process: bool = True
     """Whether to run the scheduler in a separate process."""
+
+    topology_type: TopologyType = TopologyType.Unified
+    """The type of the schedule matrix."""
 
 
 logger = logging.getLogger(__name__)
@@ -246,7 +264,7 @@ def schedule_daemon(
                 continue
 
             merged_topology, schedule_entries_all = translate_matrix(
-                matrix.shape[0], old_topology, new_topology
+                config, matrix.shape[0], old_topology, new_topology
             )
 
             # with common.Timer("schedule_daemon_dispatch_impl"):
@@ -312,7 +330,7 @@ def translate_matrix_discrete(
                 ScheduleEntry(
                     type=ScheduleEntryType.GeneralUnspecified,
                     start=start,
-                    end=end,
+                    end=max(start, end - 1),
                     target_tor=dst,
                 )
             )
@@ -320,19 +338,38 @@ def translate_matrix_discrete(
     return new_topology, schedule_entries_all
 
 
+def translate_matrix_multi_hop(
+    n_tors: int, old_topology: MultiHopTopology, new_topology: MultiHopTopology
+) -> Tuple[MultiHopTopology, List[List[ScheduleEntry]]]:
+    schedule_entries_all = [[] for _ in range(n_tors)]
+
+    for src, dst, next_hop in new_topology:
+        schedule_entries_all[src].append(
+            ScheduleEntry(
+                type=ScheduleEntryType.GeneralUnspecified,
+                start=0,
+                end=consts.SLICE_NUM - 1,
+                target_tor=dst,
+                next_hop=next_hop,
+            )
+        )
+
+    return new_topology, schedule_entries_all
+
+
 def translate_matrix(
+    config: Config,
     n_tors: int,
-    old_topology: UnifiedTopology | DiscreteTopology,
-    new_topology: UnifiedTopology | DiscreteTopology,
-) -> Tuple[UnifiedTopology | DiscreteTopology, List[List[ScheduleEntry]]]:
+    old_topology: Topology,
+    new_topology: Topology,
+) -> Tuple[Topology, List[List[ScheduleEntry]]]:
 
-    if isinstance(new_topology, set):
-        # old_topology = [((0, consts.SLICE_NUM - 1), old_topology)]
-        # new_topology = [((0, consts.SLICE_NUM - 1), new_topology)]
-        # return translate_matrix_discrete(n_tors, old_topology, new_topology)
+    if config.topology_type == TopologyType.Unified:
         return translate_matrix_unified(n_tors, old_topology, new_topology)
-
-    return translate_matrix_discrete(n_tors, old_topology, new_topology)
+    elif config.topology_type == TopologyType.Discrete:
+        return translate_matrix_discrete(n_tors, old_topology, new_topology)
+    else:
+        return translate_matrix_multi_hop(n_tors, old_topology, new_topology)
 
 
 async def schedule_daemon_clear_default_impl(clients: List[Client]):

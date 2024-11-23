@@ -24,6 +24,7 @@ message ScheduleEntry {
     uint32 start = 2;
     uint32 end = 3;
     uint32 target_tor = 4;
+    optional uint32 next_hop = 5;
 }
 
 message ResumeFlowRequest {
