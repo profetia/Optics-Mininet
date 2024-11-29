@@ -111,3 +111,20 @@ Please run the following command to turn of checksum check before test your netw
 ethtool --offload  eth0  rx off  tx off
 ethtool -K eth0 gso off
 ```
+
+## Traffic-Aware Scheduling
+
+The code for traffic-aware scheduling resides in the following locations:
+1. `ncs-nfs/OpenOptics/case_study/OpenOp_8tor_ta` contains the code for the ToR switches.
+2. `ncs-nfs/OpenOptics/case_study/ocs_kickoff_8tor_sw5_ta` contains the code for the OCS switches.
+3. `ncs-nfs/OpenOptics/case_study/electrical_sw4_ta` contains the code for the electrical switches.
+4. `ncs-nfs/OpenOptics/microbenchmarks/OpenOp_8tor_ta_benchmark` contains the benchmark code.
+5. The modified libvma and controller can be found in the PRs of the opsys and Optics-Mininet repositories.
+
+The following explains the design of the traffic-aware scheduling controller:
+
+1. The code for the controller is under the directory `runtime`. You can setup the environment easily by running `nix-shell` under `src`.
+2. The implementation of the controller is in `runtime/core.py`. The controller is implemented with two processes communicating through a shared queue. The `collector` process maintains the traffic data by reading the control messages from hosts. Users can define `TimingHandler` which is called on the collector periodically to determine if a reconfiguration is needed. And an user-defined `EventHandler` is called at every update of the traffic data. Once the collector determines a reconfiguration is needed, it sends a message to the `scheduler` process. The `scheduler` process reads the message and calls the user-defined `Scheduler` to generate the new configuration. The new configuration is then sent to the switches.
+3. File `runtime/report.py` and `runtime/rpc.py` implements the update of the traffic data and the dispatch of the configuration to the switches. Uvloop and numba are used to accelerate the dispatch of the configuration.
+4. GRPC endpoints are defined under `runtime/proto`. The directory `runtime/stub` defines consts on the switch side.
+5. The supported traffic-aware scheduling algorithms are defined in `runtime/algorithms` directory. The user can define their own algorithm following the same pattern. A typical workflow is to define a `TimingHandler` or `EventHandler` to determine a reconfiguration, and a `Scheduler` to generate the new configuration. Then call the `add_timing_handler` or `add_event_handler` to register the handler. Finally, call the `run` method to start the controller. An useful clear tool is provided in `runtime/tools` to clear the configuration of the switches.
